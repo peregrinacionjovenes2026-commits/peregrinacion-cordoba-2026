@@ -2889,7 +2889,6 @@ function renderPlanHabitaciones(){
           '<div class="hab-card-title">'+esc(h.nombre)+' '+sexoBadge+'</div>'+
           '<span class="hab-cap-badge" style="color:'+col+';background:'+(llena?'var(--rl)':ocupantes.length===0?'var(--g2)':'var(--gl)')+'">'+ocupantes.length+'/'+h.capacidad+'</span>'+
           (esAdminEdicion()?'<input type="number" value="'+h.capacidad+'" min="1" max="50" style="width:44px;font-size:.72rem;padding:2px 4px;border:1px solid var(--g2);border-radius:4px" onchange="planCambiarCapHab(\''+h.id+'\',this.value)">':'')+
-          (esAdminEdicion()?'<button onclick="planLimpiarHabSola(\''+h.id+'\')" style="color:var(--s);background:none;border:none;cursor:pointer;font-size:.72rem;padding:0 4px" title="Limpiar habitación">↺</button>':'')+
           (esAdminEdicion()?'<button onclick="planEliminarHab(\''+h.id+'\')" style="color:var(--r);background:none;border:none;cursor:pointer;font-size:.8rem">✕</button>':'')+
         '</div>'+
         '<div class="hab-drop'+(llena?' llena':'')+'" id="habdrop-'+h.id+'" ondragover="planHabOver(event)" ondragleave="planHabLeave(event)" ondrop="planHabDrop(event,\''+h.id+'\')">'+
@@ -2949,12 +2948,6 @@ function planSugerirHab(){
     var h=disponibles.find(function(h){var ocp=personas.filter(function(x){return PLAN_STATE.habitaciones.asignaciones[x.dni]===h.id;}).length;return ocp<h.capacidad;});
     if(h){PLAN_STATE.habitaciones.asignaciones[p.dni]=h.id;if(!h.sexo)h.sexo=PLAN_SEXO_HAB;}
   });
-  renderPlanHabitaciones();
-}
-function planLimpiarHabSola(hid){
-  planTodasPersonas().forEach(function(p){if(PLAN_STATE.habitaciones.asignaciones[p.dni]===hid)delete PLAN_STATE.habitaciones.asignaciones[p.dni];});
-  var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});
-  if(h)h.sexo='';
   renderPlanHabitaciones();
 }
 function planLimpiarHab(){
