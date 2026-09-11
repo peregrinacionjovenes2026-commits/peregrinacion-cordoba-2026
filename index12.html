@@ -1493,49 +1493,22 @@ function montoARS(n){
 function mensajeWhatsappPago(tipo, p, sd){
   var per = personaPorDni(sd) || {};
   var nombre = nombreCortoPersona(per.nombre || p.nombre || '');
+  var cuotas = cuotasLabelPago(p, ' y ');
   var monto = montoARS(p.monto || 0);
 
-  if (tipo === 'confirmacion') {
-    var keys = (p.cuotas || '').split(',').map(function(k){return k.trim();}).filter(Boolean);
-    var esSoloSena = keys.length === 1 && keys[0] === 'sena';
+if (tipo === 'confirmacion') {
+  var esSoloSena = (p.cuotas || '').split(',').map(function(k){
+    return k.trim();
+  }).filter(Boolean).length === 1 && (p.cuotas || '').includes('sena');
 
-    if (esSoloSena) {
-      return '¡Hola, ' + nombre + '! ¡Tu inscripción para la *Peregrinación Córdoba 2026* ya está confirmada! ✅\n\nRegistramos correctamente el pago de tu seña por *$15.000*.\n\nYa podés consultar el cronograma de tus próximas cuotas y vencimientos acá: ' + PORTAL_URL;
-    }
-
-    // Armar texto natural para múltiples cuotas
-    var plan = per.cuotasPlan || CQ.map(function(k){return {key:k,label:CL[k],monto:CM[k]};});
-    var planLabels = {}; plan.forEach(function(c){planLabels[c.key]=c.label;});
-    var labels = keys.map(function(k){return planLabels[k]||CL[k]||k;});
-
-    var cuotasTexto;
-    if(labels.length === 1){
-      cuotasTexto = 'tu ' + labels[0];
-    } else {
-      // Separar cuotas principales de actualizaciones
-      var principales = labels.filter(function(l){return !l.toLowerCase().includes('actualización')&&!l.toLowerCase().includes('ajuste');});
-      var actualizaciones = labels.filter(function(l){return l.toLowerCase().includes('actualización')||l.toLowerCase().includes('ajuste');});
-      if(principales.length && actualizaciones.length){
-        var partes = [];
-        if(principales.length) partes.push('tu '+principales.join(' y '));
-        if(actualizaciones.length) partes.push('junto con '+actualizaciones.map(function(a){return 'la '+a.toLowerCase();}).join(' y '));
-        cuotasTexto = partes.join(', ');
-      } else {
-        cuotasTexto = 'tu ' + labels.slice(0,-1).join(', ') + ' y ' + labels[labels.length-1];
-      }
-    }
-
-    // Ver si ya pagó todo para omitir la URL
-    var pagoTotal = per.pagoCompletoManual || (per.estado === 'pago_completo');
-    var cierre = pagoTotal
-      ? '¡Muchas gracias!'
-      : 'Podés ver el detalle en ' + PORTAL_URL;
-
-    return 'Hola ' + nombre + ', confirmamos que recibimos el pago de ' + cuotasTexto + ' para la *Peregrinación Córdoba 2026*, por el monto de *' + monto + '*. ' + cierre;
+  if (esSoloSena) {
+    return '¡Hola, ' + nombre + '! ¡Tu inscripción para la *Peregrinación Córdoba 2026* ya está confirmada! ✅\n\nRegistramos correctamente el pago de tu seña por *$15.000*.\n\nYa podés consultar el cronograma de tus próximas cuotas y vencimientos acá: ' + PORTAL_URL;
   }
 
+  return 'Hola ' + nombre + ', confirmamos que recibimos el pago de tu ' + cuotas + ' para la Peregrinación Córdoba 2026, por el monto de ' + monto + '. Podés ver todo el detalle de cuotas y vencimientos en ' + PORTAL_URL;
+}
+
   if (tipo === 'rechazo') {
-    var cuotas = cuotasLabelPago(p, ' y ');
     return 'Hola ' + nombre + '. No pudimos validar el comprobante cargado para ' + cuotas + ' de la Peregrinación Córdoba 2026. Necesitamos que te pongas en contacto para revisarlo.';
   }
 
