@@ -2775,9 +2775,9 @@ function renderPlanHabitaciones(){
   // Agrupar personas del sexo actual por categoría, excluyendo sin_alojamiento
   function gruposPool(){
     var pers=todasPersonas.filter(function(p){return p.sexo===sexo&&!(p.logisticaEspecial||'').includes('sin_alojamiento');});
-    // Por comunidad (solo jóvenes — Participante)
+    // Por comunidad (solo jóvenes y catequistas)
     var comunMap={};
-    pers.filter(function(p){return p.rol==='Participante';}).forEach(function(p){
+    pers.filter(function(p){return p.rol==='Participante'||p.rol==='Catequista';}).forEach(function(p){
       var c=(p.comunidad||'Sin comunidad').trim()||'Sin comunidad';
       var par=(p.parroquia||'Sin parroquia').trim()||'Sin parroquia';
       var key=c+'|'+par;
