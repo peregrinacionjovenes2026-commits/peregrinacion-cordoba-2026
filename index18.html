@@ -2753,7 +2753,7 @@ var PLAN_STATE={micros:{comunidades:{},personas:{},especiales:{}},habitaciones:{
 var PLAN_EXPANDIDOS={},PLAN_DRAGGING=null,PLAN_VISTA_ACTUAL='micros',PLAN_SEXO_HAB='Mujer',PLAN_HAB_COUNT=0,PLAN_INICIALIZADO=false;
 var PLAN_HAB_SELECCION=[];
 var PLAN_MICROS_SELECCION=[];
-var PLAN_HAB_GUARDADO_EN='',PLAN_HAB_GUARDADO_OK=true,PLAN_HAB_SYNC='local',PLAN_HAB_SAVE_TIMER=null,PLAN_HAB_CARGA_REMOTA=false;
+var PLAN_HAB_GUARDADO_EN='',PLAN_HAB_GUARDADO_OK=true;
 var PLAN_PARR_COLORES={},PLAN_PARR_LISTA=['#1a5fa8','#1a7a56','#d4820a','#b83232','#6b4ea0','#2a7a8a'];
 function planColorParroquia(p){if(!PLAN_PARR_COLORES[p]){var idx=Object.keys(PLAN_PARR_COLORES).length%PLAN_PARR_LISTA.length;PLAN_PARR_COLORES[p]=PLAN_PARR_LISTA[idx];}return PLAN_PARR_COLORES[p];}
 function planPersonasDeSexo(sexo){if(!inscriptosData||!inscriptosData.ok)return [];return inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja'&&i.sexo===sexo&&!(i.logisticaEspecial||'').includes('sin_alojamiento');});}
@@ -2768,15 +2768,11 @@ function planLimpiarSexosHabitacionesVacias(){
 function planActualizarEstadoGuardado(){
   var el=$$('hab-save-status');
   if(!el)return;
-  el.className='hab-save-status '+(PLAN_HAB_GUARDADO_OK&&PLAN_HAB_SYNC!=='error'?'ok':'err');
+  el.className='hab-save-status '+(PLAN_HAB_GUARDADO_OK?'ok':'err');
   if(!PLAN_HAB_GUARDADO_OK){el.textContent='No se pudo guardar en este navegador';return;}
   if(!PLAN_HAB_GUARDADO_EN){el.textContent='Todavía sin guardar';return;}
   var d=new Date(PLAN_HAB_GUARDADO_EN);
-  var fecha=d.toLocaleDateString('es-AR')+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-  if(PLAN_HAB_SYNC==='nube')el.textContent='✓ Guardado y sincronizado · '+fecha;
-  else if(PLAN_HAB_SYNC==='guardando')el.textContent='Guardado en este navegador · sincronizando…';
-  else if(PLAN_HAB_SYNC==='error')el.textContent='Guardado en este navegador · no se pudo sincronizar';
-  else el.textContent='✓ Guardado en este navegador · '+fecha;
+  el.textContent='✓ Guardado automáticamente · '+d.toLocaleDateString('es-AR')+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
 }
 function planGuardarHabitaciones(){
   planLimpiarSexosHabitacionesVacias();
@@ -2791,91 +2787,38 @@ function planGuardarHabitaciones(){
     }));
     PLAN_HAB_GUARDADO_OK=true;
   }catch(e){PLAN_HAB_GUARDADO_OK=false;}
-  planProgramarGuardadoHabitacionesRemoto();
   planActualizarEstadoGuardado();
-}
-function planAplicarHabitacionesGuardadas(data){
-  if(!data||!Array.isArray(data.lista)||!data.asignaciones)return false;
-  var ids={};
-  var lista=[];
-  data.lista.forEach(function(h,idx){
-    if(!h||!h.id||ids[h.id])return;
-    ids[h.id]=true;
-    var cap=Math.max(1,Math.min(100,parseInt(h.capacidad)||1));
-    lista.push({id:String(h.id),nombre:String(h.nombre||('Habitación '+(idx+1))),capacidad:cap,sexo:h.sexo==='Mujer'||h.sexo==='Varón'?h.sexo:''});
-  });
-  var personasValidas={};
-  planPersonasAlojamiento().forEach(function(p){personasValidas[String(p.dni)]=p;});
-  var asignaciones={};
-  Object.keys(data.asignaciones).forEach(function(dni){
-    var hid=String(data.asignaciones[dni]||'');
-    if(ids[hid]&&personasValidas[String(dni)])asignaciones[String(dni)]=hid;
-  });
-  PLAN_STATE.habitaciones={lista:lista,asignaciones:asignaciones};
-  PLAN_HAB_COUNT=lista.reduce(function(max,h){var m=String(h.id).match(/(\d+)$/);return Math.max(max,m?parseInt(m[1]):0);},0);
-  if(data.sexoActivo==='Mujer'||data.sexoActivo==='Varón')PLAN_SEXO_HAB=data.sexoActivo;
-  PLAN_HAB_GUARDADO_EN=data.guardadoEn||'';
-  PLAN_HAB_GUARDADO_OK=true;
-  planLimpiarSexosHabitacionesVacias();
-  return true;
 }
 function planCargarHabitaciones(){
   try{
     var raw=localStorage.getItem(HABITACIONES_KEY);
-    if(raw)planAplicarHabitacionesGuardadas(JSON.parse(raw));
-  }catch(e){PLAN_HAB_GUARDADO_OK=false;}
-}
-function planPayloadHabitaciones(){
-  return {version:1,guardadoEn:PLAN_HAB_GUARDADO_EN||new Date().toISOString(),sexoActivo:PLAN_SEXO_HAB,lista:PLAN_STATE.habitaciones.lista,asignaciones:PLAN_STATE.habitaciones.asignaciones};
-}
-function planProgramarGuardadoHabitacionesRemoto(){
-  if(!PLAN_HAB_CARGA_REMOTA||!esAdminEdicion()||!adminToken)return;
-  if(PLAN_HAB_SAVE_TIMER)clearTimeout(PLAN_HAB_SAVE_TIMER);
-  PLAN_HAB_SYNC='guardando';
-  PLAN_HAB_SAVE_TIMER=setTimeout(function(){planGuardarHabitacionesRemoto();},700);
-}
-async function planGuardarHabitacionesRemoto(){
-  if(!esAdminEdicion()||!adminToken)return false;
-  if(PLAN_HAB_SAVE_TIMER){clearTimeout(PLAN_HAB_SAVE_TIMER);PLAN_HAB_SAVE_TIMER=null;}
-  PLAN_HAB_SYNC='guardando';planActualizarEstadoGuardado();
-  try{
-    var res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savePlanHabitaciones',adminToken:adminToken,config:planPayloadHabitaciones()})});
-    var data=await res.json();
-    if(!data.ok)throw new Error(data.error||'No se pudo guardar.');
-    if(data.config&&data.config.guardadoEn)PLAN_HAB_GUARDADO_EN=data.config.guardadoEn;
-    PLAN_HAB_SYNC='nube';
-    try{localStorage.setItem(HABITACIONES_KEY,JSON.stringify(data.config||planPayloadHabitaciones()));}catch(e){}
-    planActualizarEstadoGuardado();
-    return true;
-  }catch(e){PLAN_HAB_SYNC='error';planActualizarEstadoGuardado();return false;}
-}
-async function planGuardarHabitacionesAhora(){
-  planGuardarHabitaciones();
-  await planGuardarHabitacionesRemoto();
-}
-async function planCargarHabitacionesRemoto(){
-  if(!adminToken){PLAN_HAB_CARGA_REMOTA=true;return;}
-  try{
-    var res=await fetch(API+'?action=getPlanHabitaciones&adminToken='+encodeURIComponent(adminToken));
-    var data=await res.json();
-    if(!data.ok)throw new Error(data.error||'No se pudo cargar.');
-    var localFecha=PLAN_HAB_GUARDADO_EN?new Date(PLAN_HAB_GUARDADO_EN).getTime():0;
-    var remotaFecha=data.config&&data.config.guardadoEn?new Date(data.config.guardadoEn).getTime():0;
-    if(data.config&&(adminRole==='view'||remotaFecha>=localFecha||!PLAN_STATE.habitaciones.lista.length)){
-      planAplicarHabitacionesGuardadas(data.config);
-      PLAN_HAB_SYNC='nube';
-      try{localStorage.setItem(HABITACIONES_KEY,JSON.stringify(data.config));}catch(e){}
-    }else if(data.config&&localFecha>remotaFecha){
-      PLAN_HAB_SYNC='local';
-    }else if(!data.config&&PLAN_STATE.habitaciones.lista.length){
-      PLAN_HAB_SYNC='local';
-    }else{
-      PLAN_HAB_SYNC='nube';
-    }
-  }catch(e){PLAN_HAB_SYNC=PLAN_STATE.habitaciones.lista.length?'error':'local';}
-  PLAN_HAB_CARGA_REMOTA=true;
-  if(esAdminEdicion()&&PLAN_HAB_SYNC==='local'&&PLAN_STATE.habitaciones.lista.length)planProgramarGuardadoHabitacionesRemoto();
-  planActualizarEstadoGuardado();
+    if(!raw)return;
+    var data=JSON.parse(raw);
+    if(!data||!Array.isArray(data.lista)||!data.asignaciones)return;
+    var ids={};
+    var lista=[];
+    data.lista.forEach(function(h,idx){
+      if(!h||!h.id||ids[h.id])return;
+      ids[h.id]=true;
+      var cap=Math.max(1,Math.min(100,parseInt(h.capacidad)||1));
+      lista.push({id:String(h.id),nombre:String(h.nombre||('Habitación '+(idx+1))),capacidad:cap,sexo:h.sexo==='Mujer'||h.sexo==='Varón'?h.sexo:''});
+    });
+    var personasValidas={};
+    planPersonasAlojamiento().forEach(function(p){personasValidas[String(p.dni)]=p;});
+    var asignaciones={};
+    Object.keys(data.asignaciones).forEach(function(dni){
+      var hid=String(data.asignaciones[dni]||'');
+      if(ids[hid]&&personasValidas[String(dni)])asignaciones[String(dni)]=hid;
+    });
+    PLAN_STATE.habitaciones={lista:lista,asignaciones:asignaciones};
+    PLAN_HAB_COUNT=lista.reduce(function(max,h){var m=String(h.id).match(/(\d+)$/);return Math.max(max,m?parseInt(m[1]):0);},0);
+    if(data.sexoActivo==='Mujer'||data.sexoActivo==='Varón')PLAN_SEXO_HAB=data.sexoActivo;
+    PLAN_HAB_GUARDADO_EN=data.guardadoEn||'';
+    PLAN_HAB_GUARDADO_OK=true;
+    planLimpiarSexosHabitacionesVacias();
+  }catch(e){
+    PLAN_HAB_GUARDADO_OK=false;
+  }
 }
 function planHabitacionDePersona(p){
   var hid=PLAN_STATE.habitaciones.asignaciones[p.dni];
@@ -2927,7 +2870,7 @@ function planImprimirHabitaciones(){
 }
 function planComunidades(){if(!inscriptosData||!inscriptosData.ok)return [];var mapa={};planTodasPersonas().filter(function(i){return i.rol==='Participante'&&!(i.logisticaEspecial||'').includes('sin_micro');}).forEach(function(i){var c=(i.comunidad||'Sin comunidad').trim()||'Sin comunidad',p=(i.parroquia||'Sin parroquia').trim()||'Sin parroquia';var key=c+'___'+p;if(!mapa[key])mapa[key]={id:'c_'+key.replace(/[^a-zA-Z0-9]/g,'_'),nombre:c,parroquia:p,color:planColorParroquia(p),personas:[]};mapa[key].personas.push(i);});return Object.values(mapa).sort(function(a,b){return b.personas.length-a.personas.length;});}
 function planEspeciales(){if(!inscriptosData||!inscriptosData.ok)return [];return planTodasPersonas().filter(function(i){return (i.rol==='Sacerdote'||i.rol==='Cocinero')&&!(i.logisticaEspecial||'').includes('sin_micro');});}
-async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();await planCargarHabitacionesRemoto();PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
+async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
 function planCambiarVista(v){PLAN_VISTA_ACTUAL=v;['micros','habitaciones','subgrupos'].forEach(function(tab){$$('plan-tab-'+tab).classList.toggle('active',tab===v);$$('plan-vista-'+tab).style.display=tab===v?'block':'none';});if(v==='micros')renderPlanMicros();else if(v==='habitaciones')renderPlanHabitaciones();else if(v==='subgrupos')renderPlanSubgrupos();}
 function planTotalZona(zona){var coms=planComunidades(),esp=planEspeciales(),t=0;coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if(!ps||ps===zona)t++;});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona)t++;});});esp.forEach(function(e){if(PLAN_STATE.micros.especiales[e.dni]===zona)t++;});return t;}
 function planEdadPromZona(zona){var coms=planComunidades(),edades=[];coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if((!ps||ps===zona)&&p.edad!=null)edades.push(p.edad);});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona&&p.edad!=null)edades.push(p.edad);});});if(!edades.length)return null;return Math.round(edades.reduce(function(a,b){return a+b;},0)/edades.length);}
@@ -3080,7 +3023,7 @@ function renderPlanHabitaciones(){
   html+='<div class="hab-savebar">'+
     '<span class="hab-save-status" id="hab-save-status"></span>'+
     '<div class="plan-btns">'+
-      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitacionesAhora()">Guardar ahora</button>':'')+
+      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitaciones()">Guardar ahora</button>':'')+
       '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ Descargar lista</button>'+
       '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 Imprimir</button>'+
     '</div>'+
