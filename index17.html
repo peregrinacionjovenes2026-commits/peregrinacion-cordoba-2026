@@ -354,10 +354,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
 .hab-cajita{background:var(--g1);border:1px solid var(--g2);border-radius:var(--rs);padding:.6rem;margin-bottom:.5rem;cursor:grab}
 .hab-cajita:active{cursor:grabbing}
 .hab-cajita.dragging{opacity:.25}
-.hab-savebar{background:var(--w);border:1px solid var(--g2);border-radius:var(--rs);padding:.6rem .75rem;margin-bottom:.75rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
-.hab-save-status{font-size:.7rem;color:var(--s)}
-.hab-save-status.ok{color:var(--g);font-weight:600}
-.hab-save-status.err{color:var(--r);font-weight:600}
 @media(max-width:600px){.plan-side{width:100%}.hab-sidebar{width:100%;max-height:200px}}
 </style>
 </head>
@@ -876,7 +872,6 @@ const CLD_CLOUD    = 'dfkm2rmuk';
 const CLD_PRESET   = 'peregrinacion';
 const PORTAL_URL   = window.location.origin + window.location.pathname;
 const CAMPANAS_KEY = 'peregrinacion_campanas_v1';
-const HABITACIONES_KEY = 'peregrinacion_habitaciones_v1';
 
 var estadoData=null, adminData=null, inscriptosData=null, contabilidadData=null;
 var filtroActual='pendiente', adminBusqueda='', adminToken='', adminRole='', pEmail='';
@@ -2753,124 +2748,13 @@ var PLAN_STATE={micros:{comunidades:{},personas:{},especiales:{}},habitaciones:{
 var PLAN_EXPANDIDOS={},PLAN_DRAGGING=null,PLAN_VISTA_ACTUAL='micros',PLAN_SEXO_HAB='Mujer',PLAN_HAB_COUNT=0,PLAN_INICIALIZADO=false;
 var PLAN_HAB_SELECCION=[];
 var PLAN_MICROS_SELECCION=[];
-var PLAN_HAB_GUARDADO_EN='',PLAN_HAB_GUARDADO_OK=true;
 var PLAN_PARR_COLORES={},PLAN_PARR_LISTA=['#1a5fa8','#1a7a56','#d4820a','#b83232','#6b4ea0','#2a7a8a'];
 function planColorParroquia(p){if(!PLAN_PARR_COLORES[p]){var idx=Object.keys(PLAN_PARR_COLORES).length%PLAN_PARR_LISTA.length;PLAN_PARR_COLORES[p]=PLAN_PARR_LISTA[idx];}return PLAN_PARR_COLORES[p];}
 function planPersonasDeSexo(sexo){if(!inscriptosData||!inscriptosData.ok)return [];return inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja'&&i.sexo===sexo&&!(i.logisticaEspecial||'').includes('sin_alojamiento');});}
 function planTodasPersonas(){if(!inscriptosData||!inscriptosData.ok)return [];return inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja';});}
-function planPersonasAlojamiento(){return planTodasPersonas().filter(function(i){return !(i.logisticaEspecial||'').includes('sin_alojamiento');});}
-function planLimpiarSexosHabitacionesVacias(){
-  PLAN_STATE.habitaciones.lista.forEach(function(h){
-    var ocupada=planPersonasAlojamiento().some(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;});
-    if(!ocupada)h.sexo='';
-  });
-}
-function planActualizarEstadoGuardado(){
-  var el=$$('hab-save-status');
-  if(!el)return;
-  el.className='hab-save-status '+(PLAN_HAB_GUARDADO_OK?'ok':'err');
-  if(!PLAN_HAB_GUARDADO_OK){el.textContent='No se pudo guardar en este navegador';return;}
-  if(!PLAN_HAB_GUARDADO_EN){el.textContent='Todavía sin guardar';return;}
-  var d=new Date(PLAN_HAB_GUARDADO_EN);
-  el.textContent='✓ Guardado automáticamente · '+d.toLocaleDateString('es-AR')+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-}
-function planGuardarHabitaciones(){
-  planLimpiarSexosHabitacionesVacias();
-  try{
-    PLAN_HAB_GUARDADO_EN=new Date().toISOString();
-    localStorage.setItem(HABITACIONES_KEY,JSON.stringify({
-      version:1,
-      guardadoEn:PLAN_HAB_GUARDADO_EN,
-      sexoActivo:PLAN_SEXO_HAB,
-      lista:PLAN_STATE.habitaciones.lista,
-      asignaciones:PLAN_STATE.habitaciones.asignaciones
-    }));
-    PLAN_HAB_GUARDADO_OK=true;
-  }catch(e){PLAN_HAB_GUARDADO_OK=false;}
-  planActualizarEstadoGuardado();
-}
-function planCargarHabitaciones(){
-  try{
-    var raw=localStorage.getItem(HABITACIONES_KEY);
-    if(!raw)return;
-    var data=JSON.parse(raw);
-    if(!data||!Array.isArray(data.lista)||!data.asignaciones)return;
-    var ids={};
-    var lista=[];
-    data.lista.forEach(function(h,idx){
-      if(!h||!h.id||ids[h.id])return;
-      ids[h.id]=true;
-      var cap=Math.max(1,Math.min(100,parseInt(h.capacidad)||1));
-      lista.push({id:String(h.id),nombre:String(h.nombre||('Habitación '+(idx+1))),capacidad:cap,sexo:h.sexo==='Mujer'||h.sexo==='Varón'?h.sexo:''});
-    });
-    var personasValidas={};
-    planPersonasAlojamiento().forEach(function(p){personasValidas[String(p.dni)]=p;});
-    var asignaciones={};
-    Object.keys(data.asignaciones).forEach(function(dni){
-      var hid=String(data.asignaciones[dni]||'');
-      if(ids[hid]&&personasValidas[String(dni)])asignaciones[String(dni)]=hid;
-    });
-    PLAN_STATE.habitaciones={lista:lista,asignaciones:asignaciones};
-    PLAN_HAB_COUNT=lista.reduce(function(max,h){var m=String(h.id).match(/(\d+)$/);return Math.max(max,m?parseInt(m[1]):0);},0);
-    if(data.sexoActivo==='Mujer'||data.sexoActivo==='Varón')PLAN_SEXO_HAB=data.sexoActivo;
-    PLAN_HAB_GUARDADO_EN=data.guardadoEn||'';
-    PLAN_HAB_GUARDADO_OK=true;
-    planLimpiarSexosHabitacionesVacias();
-  }catch(e){
-    PLAN_HAB_GUARDADO_OK=false;
-  }
-}
-function planHabitacionDePersona(p){
-  var hid=PLAN_STATE.habitaciones.asignaciones[p.dni];
-  return PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;})||null;
-}
-function planExportarHabitacionesCSV(){
-  if(!PLAN_STATE.habitaciones.lista.length){alert('Primero creá las habitaciones.');return;}
-  var orden={};PLAN_STATE.habitaciones.lista.forEach(function(h,i){orden[h.id]=i;});
-  var personas=planPersonasAlojamiento().slice().sort(function(a,b){
-    var ha=planHabitacionDePersona(a),hb=planHabitacionDePersona(b);
-    var oa=ha?orden[ha.id]:9999,ob=hb?orden[hb.id]:9999;
-    return oa-ob||String(a.nombre||'').localeCompare(String(b.nombre||''),'es');
-  });
-  var ocupacion={};
-  personas.forEach(function(p){var h=planHabitacionDePersona(p);if(h)ocupacion[h.id]=(ocupacion[h.id]||0)+1;});
-  var rows=personas.map(function(p){
-    var h=planHabitacionDePersona(p);
-    return {
-      'Habitación':h?h.nombre:'Sin asignar',
-      'Sexo':p.sexo||'',
-      'Ocupación':h?(ocupacion[h.id]||0):'',
-      'Capacidad':h?h.capacidad:'',
-      'Nombre':p.nombre||'',
-      'Edad':p.edad||'',
-      'Rol':p.rol||'',
-      'Comunidad':p.comunidad||'',
-      'Parroquia':p.parroquia||''
-    };
-  });
-  descargarCSV(rows,'distribucion_habitaciones');
-}
-function planImprimirHabitaciones(){
-  if(!PLAN_STATE.habitaciones.lista.length){alert('Primero creá las habitaciones.');return;}
-  var personas=planPersonasAlojamiento();
-  var bloques=PLAN_STATE.habitaciones.lista.map(function(h){
-    var ocupantes=personas.filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;}).sort(function(a,b){return String(a.nombre||'').localeCompare(String(b.nombre||''),'es');});
-    var filas=ocupantes.length?ocupantes.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(p.nombre)+'</strong></td><td>'+esc(p.edad)+'</td><td>'+esc(p.rol)+'</td><td>'+esc(p.comunidad||'')+'</td><td>'+esc(p.parroquia||'')+'</td></tr>';}).join(''):'<tr><td colspan="6" class="vacia">Sin personas asignadas</td></tr>';
-    return '<section><div class="room-title"><h2>'+esc(h.nombre)+'</h2><span>'+ocupantes.length+' / '+h.capacidad+' camas · '+esc(h.sexo||'Sexo sin definir')+'</span></div><table><thead><tr><th>#</th><th>Nombre</th><th>Edad</th><th>Rol</th><th>Comunidad</th><th>Parroquia</th></tr></thead><tbody>'+filas+'</tbody></table></section>';
-  }).join('');
-  var asignadas=Object.keys(PLAN_STATE.habitaciones.asignaciones);
-  var sinAsignar=personas.filter(function(p){return asignadas.indexOf(String(p.dni))<0;}).sort(function(a,b){return String(a.nombre||'').localeCompare(String(b.nombre||''),'es');});
-  if(sinAsignar.length){
-    bloques+='<section><div class="room-title pending"><h2>Sin asignar</h2><span>'+sinAsignar.length+' personas</span></div><table><thead><tr><th>#</th><th>Nombre</th><th>Edad</th><th>Sexo</th><th>Rol</th><th>Comunidad</th></tr></thead><tbody>'+sinAsignar.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(p.nombre)+'</strong></td><td>'+esc(p.edad)+'</td><td>'+esc(p.sexo)+'</td><td>'+esc(p.rol)+'</td><td>'+esc(p.comunidad||'')+'</td></tr>';}).join('')+'</tbody></table></section>';
-  }
-  var w=window.open('','_blank');
-  if(!w){alert('El navegador bloqueó la ventana de impresión. Habilitá las ventanas emergentes e intentá de nuevo.');return;}
-  w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Distribución de habitaciones</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1f1a;margin:0;font-size:11px}header{border-bottom:2px solid #1a7a56;margin-bottom:16px;padding-bottom:8px}h1{font-size:22px;margin:0 0 4px}header p{margin:0;color:#5a635a}section{margin:0 0 18px;break-inside:avoid}.room-title{display:flex;justify-content:space-between;align-items:end;background:#e8f5ef;border-left:4px solid #1a7a56;padding:7px 9px}.room-title.pending{background:#fef3dc;border-color:#d4820a}.room-title h2{font-size:15px;margin:0}.room-title span{color:#5a635a;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #dfe3df;padding:5px 7px;text-align:left}th{font-size:9px;text-transform:uppercase;color:#5a635a;background:#f7f8f7}.vacia{text-align:center;color:#888f88;font-style:italic;padding:10px}@media print{button{display:none}}</style></head><body><header><h1>Distribución de habitaciones</h1><p>Peregrinación Córdoba 2026 · '+new Date().toLocaleDateString('es-AR')+'</p></header>'+bloques+'</body></html>');
-  w.document.close();w.focus();setTimeout(function(){w.print();},250);
-}
 function planComunidades(){if(!inscriptosData||!inscriptosData.ok)return [];var mapa={};planTodasPersonas().filter(function(i){return i.rol==='Participante'&&!(i.logisticaEspecial||'').includes('sin_micro');}).forEach(function(i){var c=(i.comunidad||'Sin comunidad').trim()||'Sin comunidad',p=(i.parroquia||'Sin parroquia').trim()||'Sin parroquia';var key=c+'___'+p;if(!mapa[key])mapa[key]={id:'c_'+key.replace(/[^a-zA-Z0-9]/g,'_'),nombre:c,parroquia:p,color:planColorParroquia(p),personas:[]};mapa[key].personas.push(i);});return Object.values(mapa).sort(function(a,b){return b.personas.length-a.personas.length;});}
 function planEspeciales(){if(!inscriptosData||!inscriptosData.ok)return [];return planTodasPersonas().filter(function(i){return (i.rol==='Sacerdote'||i.rol==='Cocinero')&&!(i.logisticaEspecial||'').includes('sin_micro');});}
-async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
+async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
 function planCambiarVista(v){PLAN_VISTA_ACTUAL=v;['micros','habitaciones','subgrupos'].forEach(function(tab){$$('plan-tab-'+tab).classList.toggle('active',tab===v);$$('plan-vista-'+tab).style.display=tab===v?'block':'none';});if(v==='micros')renderPlanMicros();else if(v==='habitaciones')renderPlanHabitaciones();else if(v==='subgrupos')renderPlanSubgrupos();}
 function planTotalZona(zona){var coms=planComunidades(),esp=planEspeciales(),t=0;coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if(!ps||ps===zona)t++;});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona)t++;});});esp.forEach(function(e){if(PLAN_STATE.micros.especiales[e.dni]===zona)t++;});return t;}
 function planEdadPromZona(zona){var coms=planComunidades(),edades=[];coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if((!ps||ps===zona)&&p.edad!=null)edades.push(p.edad);});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona&&p.edad!=null)edades.push(p.edad);});});if(!edades.length)return null;return Math.round(edades.reduce(function(a,b){return a+b;},0)/edades.length);}
@@ -3016,16 +2900,7 @@ function renderPlanHabitaciones(){
     '</div>'+
     '<div class="plan-btns">'+
       (esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirHab()">✦ Sugerir asignación</button>':'')+
-      (esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planLimpiarHab()">↺ Limpiar personas</button>':'')+
-    '</div>'+
-  '</div>';
-
-  html+='<div class="hab-savebar">'+
-    '<span class="hab-save-status" id="hab-save-status"></span>'+
-    '<div class="plan-btns">'+
-      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitaciones()">Guardar ahora</button>':'')+
-      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ Descargar lista</button>'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 Imprimir</button>'+
+      '<button class="bs bsm" style="margin-top:0" onclick="planLimpiarHab()">↺ Limpiar</button>'+
     '</div>'+
   '</div>';
 
@@ -3109,18 +2984,16 @@ function renderPlanHabitaciones(){
   $$('plan-vista-habitaciones').innerHTML=html;
   planBindHabEvents();
   planActualizarWarnHab();
-  planActualizarEstadoGuardado();
 }
-function planSetSexoHab(s){PLAN_SEXO_HAB=s;PLAN_HAB_SELECCION=[];planGuardarHabitaciones();renderPlanHabitaciones();}
-function planAgregarHab(){var nombre=($$('hab-nombre-nuevo')&&$$('hab-nombre-nuevo').value.trim())||'Habitación '+(PLAN_HAB_COUNT+1),cap=parseInt(($$('hab-cap-nuevo')&&$$('hab-cap-nuevo').value)||8)||8;PLAN_HAB_COUNT++;PLAN_STATE.habitaciones.lista.push({id:'h'+PLAN_HAB_COUNT,nombre:nombre,capacidad:cap,sexo:''});planGuardarHabitaciones();renderPlanHabitaciones();}
-function planEliminarHab(hid){planTodasPersonas().forEach(function(p){if(PLAN_STATE.habitaciones.asignaciones[p.dni]===hid)delete PLAN_STATE.habitaciones.asignaciones[p.dni];});PLAN_STATE.habitaciones.lista=PLAN_STATE.habitaciones.lista.filter(function(h){return h.id!==hid;});planGuardarHabitaciones();renderPlanHabitaciones();}
-function planCambiarCapHab(hid,val){var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});if(h)h.capacidad=parseInt(val)||1;planGuardarHabitaciones();renderPlanHabitaciones();}
+function planSetSexoHab(s){PLAN_SEXO_HAB=s;PLAN_HAB_SELECCION=[];renderPlanHabitaciones();}
+function planAgregarHab(){var nombre=($$('hab-nombre-nuevo')&&$$('hab-nombre-nuevo').value.trim())||'Habitación '+(PLAN_HAB_COUNT+1),cap=parseInt(($$('hab-cap-nuevo')&&$$('hab-cap-nuevo').value)||8)||8;PLAN_HAB_COUNT++;PLAN_STATE.habitaciones.lista.push({id:'h'+PLAN_HAB_COUNT,nombre:nombre,capacidad:cap,sexo:''});renderPlanHabitaciones();}
+function planEliminarHab(hid){planTodasPersonas().forEach(function(p){if(PLAN_STATE.habitaciones.asignaciones[p.dni]===hid)delete PLAN_STATE.habitaciones.asignaciones[p.dni];});PLAN_STATE.habitaciones.lista=PLAN_STATE.habitaciones.lista.filter(function(h){return h.id!==hid;});renderPlanHabitaciones();}
+function planCambiarCapHab(hid,val){var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});if(h)h.capacidad=parseInt(val)||1;renderPlanHabitaciones();}
 function planDevolverHab(pid){
   var hid=PLAN_STATE.habitaciones.asignaciones[pid];
   delete PLAN_STATE.habitaciones.asignaciones[pid];
   // Si la habitación quedó vacía, limpiar su sexo asignado
   if(hid){var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});if(h){var ocp=planTodasPersonas().filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===hid;}).length;if(!ocp)h.sexo='';}}
-  planGuardarHabitaciones();
   renderPlanHabitaciones();
 }
 function planSugerirHab(){
@@ -3133,22 +3006,17 @@ function planSugerirHab(){
     var h=disponibles.find(function(h){var ocp=personas.filter(function(x){return PLAN_STATE.habitaciones.asignaciones[x.dni]===h.id;}).length;return ocp<h.capacidad;});
     if(h){PLAN_STATE.habitaciones.asignaciones[p.dni]=h.id;if(!h.sexo)h.sexo=PLAN_SEXO_HAB;}
   });
-  planGuardarHabitaciones();
   renderPlanHabitaciones();
 }
 function planLimpiarHabSola(hid){
   planTodasPersonas().forEach(function(p){if(PLAN_STATE.habitaciones.asignaciones[p.dni]===hid)delete PLAN_STATE.habitaciones.asignaciones[p.dni];});
   var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});
   if(h)h.sexo='';
-  planGuardarHabitaciones();
   renderPlanHabitaciones();
 }
 function planLimpiarHab(){
-  if(!confirm('Se quitarán todas las personas de todas las habitaciones. Las habitaciones creadas se conservarán. ¿Continuar?'))return;
-  PLAN_STATE.habitaciones.asignaciones={};
-  PLAN_STATE.habitaciones.lista.forEach(function(h){h.sexo='';});
-  PLAN_HAB_SELECCION=[];
-  planGuardarHabitaciones();
+  planPersonasDeSexo(PLAN_SEXO_HAB).forEach(function(p){delete PLAN_STATE.habitaciones.asignaciones[p.dni];});
+  PLAN_STATE.habitaciones.lista.forEach(function(h){var ocp=planTodasPersonas().filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;}).length;if(!ocp)h.sexo='';});
   renderPlanHabitaciones();
 }
 function planActualizarWarnHab(){var warn=$$('plan-warn-hab');if(!warn)return;var personas=planPersonasDeSexo(PLAN_SEXO_HAB),sin=personas.filter(function(p){return !PLAN_STATE.habitaciones.asignaciones[p.dni];}).length;if(sin>0&&PLAN_STATE.habitaciones.lista.length>0){warn.style.display='block';warn.textContent=sin+' persona'+(sin>1?'s':'')+' sin habitación asignada.';}else warn.style.display='none';}
@@ -3181,7 +3049,6 @@ function planAsignarSeleccion(hid){
     }
   });
   PLAN_HAB_SELECCION=[];
-  planGuardarHabitaciones();
   renderPlanHabitaciones();
 }
 function planBindHabEvents(){
@@ -3221,7 +3088,7 @@ function planHabDrop(e,hid){
     }
   });
   PLAN_HAB_SELECCION=[];
-  PLAN_DRAGGING=null;planGuardarHabitaciones();renderPlanHabitaciones();
+  PLAN_DRAGGING=null;renderPlanHabitaciones();
 }
 
 function planPersonasEnZona(zona){var coms=planComunidades(),todas=planTodasPersonas(),pids=[];coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if(!ps||ps===zona)pids.push(p.dni);});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&pids.indexOf(p.dni)<0)pids.push(p.dni);});});planEspeciales().forEach(function(e){if(PLAN_STATE.micros.especiales[e.dni]===zona&&pids.indexOf(e.dni)<0)pids.push(e.dni);});return todas.filter(function(p){return pids.indexOf(p.dni)>=0;});}
