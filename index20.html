@@ -535,20 +535,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
           <option value="nombre">Por nombre</option>
           <option value="reciente">Más recientes primero</option>
         </select>
-        <select id="ins-fedad" class="ins-sel" onchange="renderInscriptos()">
-          <option value="">Todas las edades</option>
-          <option value="menores">Menores de edad (−18)</option>
-          <option value="mayores">Mayores de edad (18+)</option>
-        </select>
-        <select id="ins-fdoc" class="ins-sel" onchange="renderInscriptos()">
-          <option value="">Toda la documentación</option>
-          <option value="doc_pendiente">Documentación pendiente</option>
-          <option value="aut_ok">✓ Autorización entregada</option>
-          <option value="aut_falta">✗ Falta autorización</option>
-          <option value="dni_ok">✓ DNI copia entregada</option>
-          <option value="dni_falta">✗ Falta copia DNI</option>
-          <option value="completa">Todo completo</option>
-        </select>
         <input type="text" id="ins-search" class="ins-search" placeholder="Buscar..." oninput="renderInscriptos()">
         <div style="width:100%;display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.4rem;flex-wrap:wrap">
           <button class="bp bsm" style="margin-top:0" onclick="abrirModalAltaManual()">+ Agregar sacerdote / cocinero</button>
@@ -564,7 +550,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
       <div id="ins-load" class="load" style="display:none"><div class="spin"></div><span>Cargando...</span></div>
       <div style="overflow-x:auto">
         <table class="itable">
-          <thead><tr><th>#</th><th>Nombre</th><th>DNI</th><th>Edad</th><th>Nac.</th><th>Parroquia</th><th>Comunidad</th><th>Rol</th><th>Inscripción</th><th>Cupo</th><th>Estado</th><th>Confirmado</th><th>Docs</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Nombre</th><th>DNI</th><th>Parroquia</th><th>Comunidad</th><th>Rol</th><th>Inscripción</th><th>Cupo</th><th>Estado</th><th>Confirmado</th><th></th></tr></thead>
           <tbody id="ins-tbody"></tbody>
         </table>
       </div>
@@ -1803,21 +1789,11 @@ function renderInscriptos(){
   var fp=$$('ins-fp').value, fc=$$('ins-fc').value;
   var ord=$$('ins-ord').value;
   var busq=($$('ins-search').value||'').toLowerCase();
-  var fedad=$$('ins-fedad')?$$('ins-fedad').value:'';
-  var fdoc=$$('ins-fdoc')?$$('ins-fdoc').value:'';
   if(fe) lista=lista.filter(function(i){return i.estado===fe;});
   if(fq) lista=lista.filter(function(i){return aplicaFiltroCuotasInscripto(i,fq);});
   if(fr) lista=lista.filter(function(i){return i.rol===fr;});
   if(fp) lista=lista.filter(function(i){return i.parroquia===fp;});
   if(fc) lista=lista.filter(function(i){return i.comunidad===fc;});
-  if(fedad==='menores') lista=lista.filter(function(i){return i.edad!=null&&i.edad<18;});
-  if(fedad==='mayores') lista=lista.filter(function(i){return i.edad==null||i.edad>=18;});
-  if(fdoc==='doc_pendiente') lista=lista.filter(function(i){return i.edad!=null&&i.edad<18&&(!i.autorizacionEntregada||!i.dniCopiaEntregada);});
-  if(fdoc==='aut_ok')    lista=lista.filter(function(i){return i.autorizacionEntregada;});
-  if(fdoc==='aut_falta') lista=lista.filter(function(i){return i.edad!=null&&i.edad<18&&!i.autorizacionEntregada;});
-  if(fdoc==='dni_ok')    lista=lista.filter(function(i){return i.dniCopiaEntregada;});
-  if(fdoc==='dni_falta') lista=lista.filter(function(i){return i.edad!=null&&i.edad<18&&!i.dniCopiaEntregada;});
-  if(fdoc==='completa')  lista=lista.filter(function(i){return i.edad==null||i.edad>=18||(i.autorizacionEntregada&&i.dniCopiaEntregada);});
   if(busq) lista=lista.filter(function(i){return i.nombre.toLowerCase().includes(busq)||String(i.dni).includes(busq)||i.parroquia.toLowerCase().includes(busq)||i.comunidad.toLowerCase().includes(busq);});
   if(ord==='nombre') lista=lista.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);});
   else if(ord==='reciente') lista=lista.slice().sort(function(a,b){return b.orden-a.orden;});
@@ -1876,8 +1852,6 @@ function renderInscriptos(){
       '<td style="color:var(--s)">'+ins.orden+'</td>'+
       '<td style="font-weight:600">'+ins.nombre+avisoSena+'</td>'+
       '<td>'+ins.dni+'</td>'+
-      '<td>'+(ins.edad!=null?ins.edad:"—")+'</td>'+
-      '<td>'+(ins.nacionalidad||"—")+'</td>'+
       '<td>'+ins.parroquia+'</td>'+
       '<td>'+ins.comunidad+'</td>'+
       '<td>'+ins.rol+'</td>'+
@@ -1885,29 +1859,9 @@ function renderInscriptos(){
       '<td>'+cupo+'</td>'+
       '<td><span class="epill" style="background:'+eb+';color:'+ec+'">'+el+'</span></td>'+
       '<td style="font-weight:600;color:var(--g)">$'+totalMostrado.toLocaleString('es-AR')+'</td>'+
-      '<td style="white-space:nowrap">'+(ins.edad!=null&&ins.edad<18?(esAdminEdicion()?'<span onclick="toggleDoc(\'' +ins.dni+ '\',\'autorizacion\',' +(ins.autorizacionEntregada?'true':'false')+ ')" style="cursor:pointer;font-size:1rem;user-select:none" title="Autorización">'+(ins.autorizacionEntregada?'✅':'⬜')+'</span>'+'<span onclick="toggleDoc(\'' +ins.dni+ '\',\'dniCopia\',' +(ins.dniCopiaEntregada?'true':'false')+ ')" style="cursor:pointer;font-size:1rem;user-select:none;margin-left:4px" title="Copia DNI">'+(ins.dniCopiaEntregada?'🪪':'⬜')+'</span>':(ins.autorizacionEntregada?'✅':'⬜')+(ins.dniCopiaEntregada?'🪪':'⬜')):'')+'</td>'+
       '<td>'+(menuItems?'<div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+menuId+'\')">···</button><div class="menu-drop" id="'+menuId+'">'+menuItems+'</div></div>':'<span style="color:var(--g4)">—</span>')+'</td>'+
     '</tr>';
   }).join('');
-}
-
-async function toggleDoc(dni, campo, valorActual){
-  if(!esAdminEdicion()) return;
-  var nuevoValor = valorActual==='true'||valorActual===true ? false : true;
-  try{
-    var url=API+'?action=marcarDocumentacion&adminToken='+encodeURIComponent(adminToken)+'&dni='+encodeURIComponent(dni)+'&campo='+campo+'&valor='+nuevoValor;
-    var res=await fetch(url);
-    var data=await res.json();
-    if(!data.ok){alert('Error: '+(data.error||'sin detalle'));return;}
-    if(inscriptosData&&inscriptosData.inscriptos){
-      var ins=inscriptosData.inscriptos.find(function(i){return String(i.dni)===String(dni);});
-      if(ins){
-        if(campo==='autorizacion') ins.autorizacionEntregada=nuevoValor;
-        else if(campo==='dniCopia') ins.dniCopiaEntregada=nuevoValor;
-      }
-    }
-    renderInscriptos();
-  }catch(e){alert('Error de conexión.');}
 }
 
 function toggleMenu(id){
@@ -3893,9 +3847,6 @@ async function exportarCSV(){
           orden:i.orden,
           nombre:i.nombre,
           dni:i.dni,
-          edad:i.edad!=null?i.edad:'',
-          menor_de_edad:i.edad!=null&&i.edad<18?'Si':'No',
-          nacionalidad:i.nacionalidad||'',
           email:i.email,
           celular:i.celular,
           parroquia:i.parroquia,
@@ -3905,9 +3856,7 @@ async function exportarCSV(){
           cupo:i.estadoCupo,
           estado:i.estado,
           confirmado:i.resumen?i.resumen.totalPagado:0,
-          avisoSena:i.fechaAvisoSena||'',
-          autorizacion:i.autorizacionEntregada?'Si':'',
-          dni_copia:i.dniCopiaEntregada?'Si':''
+          avisoSena:i.fechaAvisoSena||''
         };
       });
       descargarCSV(ins,'inscriptos_filtrados_peregrinacion_2026');
