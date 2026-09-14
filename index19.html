@@ -343,7 +343,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
 .hab-chip .rm{cursor:pointer;color:var(--g4);font-size:.8rem;line-height:1;margin-left:1px}
 .hab-chip .rm:hover{color:var(--r)}
 .hab-footer{margin-top:.35rem;padding-top:.35rem;border-top:1px solid var(--g2);font-size:.68rem;color:var(--s);display:flex;gap:.75rem;flex-wrap:wrap}
-.hab-sidebar{width:220px;flex-shrink:0;height:calc(100vh - 280px);overflow-y:auto;position:sticky;top:80px;align-self:flex-start}
+.hab-sidebar{width:185px;flex-shrink:0;max-height:520px;overflow-y:auto}
 .sid-per{padding:.4rem .55rem;border-radius:var(--rs);border:1px solid var(--g2);background:var(--w);cursor:grab;font-size:.74rem;margin-bottom:.3rem;display:flex;align-items:center;gap:.5rem;user-select:none}
 .sid-per.asignada{opacity:.35;cursor:default;pointer-events:none}
 .sg-card{background:var(--w);border:1px solid var(--g2);border-radius:var(--rs);padding:.6rem;margin-bottom:.5rem}
@@ -2749,7 +2749,7 @@ function renderContabilidad(){
 
 
 // ── PLANIFICACIÓN ────────────────────────────────────────
-var PLAN_STATE={micros:{comunidades:{},personas:{},especiales:{},capacidades:{a:59,b:59}},habitaciones:{lista:[],asignaciones:{}},subgrupos:{a:[],b:[]}};
+var PLAN_STATE={micros:{comunidades:{},personas:{},especiales:{}},habitaciones:{lista:[],asignaciones:{}},subgrupos:{a:[],b:[]}};
 var PLAN_EXPANDIDOS={},PLAN_DRAGGING=null,PLAN_VISTA_ACTUAL='micros',PLAN_SEXO_HAB='Mujer',PLAN_HAB_COUNT=0,PLAN_INICIALIZADO=false;
 var PLAN_HAB_SELECCION=[];
 var PLAN_MICROS_SELECCION=[];
@@ -2881,81 +2881,6 @@ function planHabitacionDePersona(p){
   var hid=PLAN_STATE.habitaciones.asignaciones[p.dni];
   return PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;})||null;
 }
-function planExportarHabitacionesWA(){
-  if(!PLAN_STATE.habitaciones.lista.length){alert('Primero creá las habitaciones.');return;}
-  var personas=planPersonasAlojamiento();
-  var texto=PLAN_STATE.habitaciones.lista.map(function(h){
-    var ocupantes=personas.filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;});
-    if(!ocupantes.length)return '';
-    return '*'+h.nombre+'* ('+ocupantes.length+'/'+h.capacidad+')\n'+
-      ocupantes.map(function(p,i){return (i+1)+'. '+p.nombre+(p.edad?' ('+p.edad+')':'');}).join('\n');
-  }).filter(Boolean).join('\n\n');
-  navigator.clipboard.writeText(texto).then(function(){alert('✓ Lista copiada. Podés pegarla en WhatsApp.');}).catch(function(){alert(texto);});
-}
-
-function planGuardarMicros(){
-  // Guarda el estado de micros junto con habitaciones en el mismo storage
-  planGuardarHabitaciones();
-  planGuardarHabitacionesRemoto();
-}
-
-function planExportarMicrosCSV(){
-  var todas=planTodasPersonas();
-  var rows=[];
-  planComunidades().forEach(function(c){
-    var zona=PLAN_STATE.micros.comunidades[c.id];
-    c.personas.forEach(function(p){
-      var ps=PLAN_STATE.micros.personas[p.dni]||zona;
-      rows.push({'Micro':ps==='a'?'Micro A':ps==='b'?'Micro B':'Sin asignar','Nombre':p.nombre,'Edad':p.edad||'','Comunidad':p.comunidad||'','Parroquia':p.parroquia||''});
-    });
-  });
-  planEspeciales().forEach(function(e){
-    var z=PLAN_STATE.micros.especiales[e.dni];
-    rows.push({'Micro':z==='a'?'Micro A':z==='b'?'Micro B':'Sin asignar','Nombre':e.nombre,'Edad':e.edad||'','Comunidad':e.rol,'Parroquia':e.parroquia||''});
-  });
-  descargarCSV(rows,'distribucion_micros');
-}
-
-function planImprimirMicros(){
-  var todas=planTodasPersonas();
-  var micros={a:[],b:[]};
-  planComunidades().forEach(function(c){
-    var zona=PLAN_STATE.micros.comunidades[c.id];
-    c.personas.forEach(function(p){
-      var ps=PLAN_STATE.micros.personas[p.dni]||zona;
-      if(ps==='a'||ps==='b')micros[ps].push(p);
-    });
-  });
-  planEspeciales().forEach(function(e){
-    var z=PLAN_STATE.micros.especiales[e.dni];
-    if(z==='a'||z==='b')micros[z].push(e);
-  });
-  var bloques=['a','b'].map(function(z){
-    var lista=micros[z];
-    if(!lista.length)return '';
-    var filas=lista.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td><strong>'+esc(p.nombre)+'</strong></td><td>'+esc(p.edad||'-')+'</td><td>'+esc(p.rol||'')+'</td><td>'+esc(p.comunidad||'')+'</td><td>'+esc(p.parroquia||'')+'</td></tr>';}).join('');
-    return '<section><div class="room-title"><h2>Micro '+(z==='a'?'A':'B')+'</h2><span>'+lista.length+' personas</span></div><table><thead><tr><th>#</th><th>Nombre</th><th>Edad</th><th>Rol</th><th>Comunidad</th><th>Parroquia</th></tr></thead><tbody>'+filas+'</tbody></table></section>';
-  }).join('');
-  var w=window.open('','_blank');
-  if(!w){alert('Habilitá las ventanas emergentes e intentá de nuevo.');return;}
-  w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Distribución de micros</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1f1a;margin:0;font-size:11px}h1{font-size:22px;margin:0 0 4px}header{border-bottom:2px solid #1a5fa8;margin-bottom:16px;padding-bottom:8px}section{margin:0 0 18px;break-inside:avoid}.room-title{display:flex;justify-content:space-between;align-items:end;background:#e8f0fc;border-left:4px solid #1a5fa8;padding:7px 9px}.room-title h2{font-size:15px;margin:0}.room-title span{color:#5a635a;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #dfe3df;padding:5px 7px;text-align:left}th{font-size:9px;text-transform:uppercase;color:#5a635a;background:#f7f8f7}</style></head><body><header><h1>Distribución de micros</h1><p>Peregrinación Córdoba 2026 · '+new Date().toLocaleDateString('es-AR')+'</p></header>'+bloques+'</body></html>');
-  w.document.close();setTimeout(function(){w.print();},250);
-}
-
-function planExportarMicrosWA(){
-  var todas=planTodasPersonas();
-  var micros={a:[],b:[]};
-  planComunidades().forEach(function(c){
-    var zona=PLAN_STATE.micros.comunidades[c.id];
-    c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni]||zona;if(ps==='a'||ps==='b')micros[ps].push(p);});
-  });
-  planEspeciales().forEach(function(e){var z=PLAN_STATE.micros.especiales[e.dni];if(z==='a'||z==='b')micros[z].push(e);});
-  var texto=['a','b'].filter(function(z){return micros[z].length;}).map(function(z){
-    return '*Micro '+(z==='a'?'A':'B')+'* ('+micros[z].length+' personas)\n'+micros[z].map(function(p,i){return (i+1)+'. '+p.nombre+(p.edad?' ('+p.edad+')':'');}).join('\n');
-  }).join('\n\n');
-  navigator.clipboard.writeText(texto).then(function(){alert('✓ Lista copiada.');}).catch(function(){alert(texto);});
-}
-
 function planExportarHabitacionesCSV(){
   if(!PLAN_STATE.habitaciones.lista.length){alert('Primero creá las habitaciones.');return;}
   var orden={};PLAN_STATE.habitaciones.lista.forEach(function(h,i){orden[h.id]=i;});
@@ -3001,12 +2926,12 @@ function planImprimirHabitaciones(){
   w.document.close();w.focus();setTimeout(function(){w.print();},250);
 }
 function planComunidades(){if(!inscriptosData||!inscriptosData.ok)return [];var mapa={};planTodasPersonas().filter(function(i){return i.rol==='Participante'&&!(i.logisticaEspecial||'').includes('sin_micro');}).forEach(function(i){var c=(i.comunidad||'Sin comunidad').trim()||'Sin comunidad',p=(i.parroquia||'Sin parroquia').trim()||'Sin parroquia';var key=c+'___'+p;if(!mapa[key])mapa[key]={id:'c_'+key.replace(/[^a-zA-Z0-9]/g,'_'),nombre:c,parroquia:p,color:planColorParroquia(p),personas:[]};mapa[key].personas.push(i);});return Object.values(mapa).sort(function(a,b){return b.personas.length-a.personas.length;});}
-function planEspeciales(){if(!inscriptosData||!inscriptosData.ok)return [];return planTodasPersonas().filter(function(i){return (i.rol==='Sacerdote'||i.rol==='Cocinero'||i.rol==='Catequista')&&!(i.logisticaEspecial||'').includes('sin_micro');});}
+function planEspeciales(){if(!inscriptosData||!inscriptosData.ok)return [];return planTodasPersonas().filter(function(i){return (i.rol==='Sacerdote'||i.rol==='Cocinero')&&!(i.logisticaEspecial||'').includes('sin_micro');});}
 async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();await planCargarHabitacionesRemoto();PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
 function planCambiarVista(v){PLAN_VISTA_ACTUAL=v;['micros','habitaciones','subgrupos'].forEach(function(tab){$$('plan-tab-'+tab).classList.toggle('active',tab===v);$$('plan-vista-'+tab).style.display=tab===v?'block':'none';});if(v==='micros')renderPlanMicros();else if(v==='habitaciones')renderPlanHabitaciones();else if(v==='subgrupos')renderPlanSubgrupos();}
 function planTotalZona(zona){var coms=planComunidades(),esp=planEspeciales(),t=0;coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if(!ps||ps===zona)t++;});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona)t++;});});esp.forEach(function(e){if(PLAN_STATE.micros.especiales[e.dni]===zona)t++;});return t;}
 function planEdadPromZona(zona){var coms=planComunidades(),edades=[];coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if((!ps||ps===zona)&&p.edad!=null)edades.push(p.edad);});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona&&p.edad!=null)edades.push(p.edad);});});if(!edades.length)return null;return Math.round(edades.reduce(function(a,b){return a+b;},0)/edades.length);}
-function planRenderMicroCol(zona,titulo,color){var coms=planComunidades(),t=planTotalZona(zona),ep=planEdadPromZona(zona);var cap=(PLAN_STATE.micros.capacidades&&PLAN_STATE.micros.capacidades[zona])||59;var col=t>cap?'var(--r)':t>Math.floor(cap*0.85)?'var(--a)':'var(--g)';var bloques=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]===zona;}).map(function(c){return planRenderComBlock(c,zona);}).join('');var sueltas='';coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]!==zona){c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona)sueltas+='<div class="per-pill fuera" draggable="true" id="persuelta-'+p.dni+'"><span style="width:7px;height:7px;border-radius:50%;background:'+c.color+';display:inline-block"></span>'+esc(p.nombre.split(' ')[0])+' ('+p.edad+')</div>';});}});var esps=planEspeciales().filter(function(e){return PLAN_STATE.micros.especiales[e.dni]===zona;}).map(function(e){var col2=planColorParroquia(e.parroquia||'');return '<div class="com-block" draggable="true" id="espblock-'+e.dni+'"><div class="com-block-header"><div class="com-dot" style="background:'+col2+'">'+e.nombre.charAt(0)+'</div><div class="com-name">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><span class="badge" style="background:var(--bl);color:var(--b);font-size:.62rem">'+esc(e.rol)+'</span></div></div>';}).join('');return '<div class="plan-col"><div class="plan-col-title"><span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block"></span>'+titulo+(esAdminEdicion()?'<input type="number" min="1" max="120" value="'+cap+'" style="width:50px;font-size:.72rem;padding:2px 5px;border:1px solid var(--g2);border-radius:4px;margin-left:auto" title="Capacidad del micro" onchange="planSetCapMicro(\''+zona+'\',this.value)" onclick="event.stopPropagation()">':'')+'</div><div class="plan-col-stats" id="pstats-'+zona+'"><span style="color:'+col+';font-weight:700">'+t+'</span>/~59 personas'+(ep?' · edad prom. '+ep:'')+'</div><div class="plan-drop" id="pdrop-'+zona+'" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\''+zona+'\')">'+( bloques||sueltas||esps?bloques+sueltas+esps:'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Arrastrá aquí</div>')+'</div></div>';}
+function planRenderMicroCol(zona,titulo,color){var coms=planComunidades(),t=planTotalZona(zona),ep=planEdadPromZona(zona),col=t>59?'var(--r)':t>50?'var(--a)':'var(--g)';var bloques=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]===zona;}).map(function(c){return planRenderComBlock(c,zona);}).join('');var sueltas='';coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]!==zona){c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona)sueltas+='<div class="per-pill fuera" draggable="true" id="persuelta-'+p.dni+'"><span style="width:7px;height:7px;border-radius:50%;background:'+c.color+';display:inline-block"></span>'+esc(p.nombre.split(' ')[0])+' ('+p.edad+')</div>';});}});var esps=planEspeciales().filter(function(e){return PLAN_STATE.micros.especiales[e.dni]===zona;}).map(function(e){var col2=planColorParroquia(e.parroquia||'');return '<div class="com-block" draggable="true" id="espblock-'+e.dni+'"><div class="com-block-header"><div class="com-dot" style="background:'+col2+'">'+e.nombre.charAt(0)+'</div><div class="com-name">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><span class="badge" style="background:var(--bl);color:var(--b);font-size:.62rem">'+esc(e.rol)+'</span></div></div>';}).join('');return '<div class="plan-col"><div class="plan-col-title"><span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block"></span>'+titulo+'</div><div class="plan-col-stats" id="pstats-'+zona+'"><span style="color:'+col+';font-weight:700">'+t+'</span>/~59 personas'+(ep?' · edad prom. '+ep:'')+'</div><div class="plan-drop" id="pdrop-'+zona+'" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\''+zona+'\')">'+( bloques||sueltas||esps?bloques+sueltas+esps:'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Arrastrá aquí</div>')+'</div></div>';}
 function planRenderComBlock(c,zona){
   var open=!!PLAN_EXPANDIDOS[c.id];
   var externas=c.personas.filter(function(p){var ps=PLAN_STATE.micros.personas[p.dni];return ps&&ps!==zona;}).length;
@@ -3040,7 +2965,7 @@ function planRenderComBlock(c,zona){
     pillsHtml+
   '</div>';
 }
-function renderPlanMicros(){var coms=planComunidades(),esp=planEspeciales();var html='<div class="plan-toolbar"><div class="plan-subtitle">Arrastrá comunidades entre micros. Expandí ▾ para mover personas individuales.</div><div class="plan-btns">'+(esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirMicros()">✦ Sugerir distribución</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planResetearMicros()">↺ Reiniciar</button>'+(esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarMicros()">💾 Guardar</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planExportarMicrosCSV()">⬇ CSV</button><button class="bs bsm" style="margin-top:0" onclick="planImprimirMicros()">🖨 PDF</button><button class="bs bsm" style="margin-top:0" onclick="planExportarMicrosWA()">📋 WhatsApp</button></div></div><div class="plan-warn" id="plan-warn-micros"></div><div style="display:flex;gap:.65rem;align-items:flex-start"><div style="flex:1;min-width:0"><div style="display:flex;gap:.65rem;margin-bottom:.65rem">'+planRenderMicroCol('a','Micro A','#1a5fa8')+planRenderMicroCol('b','Micro B','#1a7a56')+'</div>'+'<div class="plan-subtitle" style="margin-bottom:.3rem">Sin asignar</div>'+'<div class="plan-drop" id="pdrop-sin" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\'sin\')">'+(function(){var sc=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]==='sin';});var blocksHtml=sc.map(function(c){return planRenderComBlock(c,'sin');}).join('');return blocksHtml||(sc.length===0?'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Todas las comunidades están asignadas</div>':'');})()+'</div></div><div class="plan-side"><div class="plan-side-title">Catequistas · Sacerdotes · Cocineros</div><div style="font-size:.68rem;color:var(--g4);margin-bottom:.5rem">Arrastrá directo a un micro</div><div id="plan-side-esp">'+esp.map(function(e){var z=PLAN_STATE.micros.especiales[e.dni],color=planColorParroquia(e.parroquia||''),initials=e.nombre.trim().split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();return '<div class="side-esp-card'+(z!=='sin'?' asignada':'')+'" id="sidesp-'+e.dni+'" draggable="'+(z==='sin'?'true':'false')+'"><div class="com-dot" style="background:'+color+';width:22px;height:22px;font-size:.6rem">'+initials+'</div><div style="flex:1;min-width:0"><div style="font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><div style="font-size:.66rem;color:var(--s)">'+esc(e.rol)+(z!=='sin'?' · Micro '+(z==='a'?'A':'B'):'')+'</div></div></div>';}).join('')+'</div></div></div>';$$('plan-vista-micros').innerHTML=html;planBindMicrosEvents();planActualizarStatsMicros();}
+function renderPlanMicros(){var coms=planComunidades(),esp=planEspeciales();var html='<div class="plan-toolbar"><div class="plan-subtitle">Arrastrá comunidades entre micros. Expandí ▾ para mover personas individuales.</div><div class="plan-btns">'+(esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirMicros()">✦ Sugerir distribución</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planResetearMicros()">↺ Reiniciar</button></div></div><div class="plan-warn" id="plan-warn-micros"></div><div style="display:flex;gap:.65rem;align-items:flex-start"><div style="flex:1;min-width:0"><div style="display:flex;gap:.65rem;margin-bottom:.65rem">'+planRenderMicroCol('a','Micro A','#1a5fa8')+planRenderMicroCol('b','Micro B','#1a7a56')+'</div>'+'<div class="plan-subtitle" style="margin-bottom:.3rem">Sin asignar</div>'+'<div class="plan-drop" id="pdrop-sin" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\'sin\')">'+(function(){var sc=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]==='sin';});var blocksHtml=sc.map(function(c){return planRenderComBlock(c,'sin');}).join('');return blocksHtml||(sc.length===0?'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Todas las comunidades están asignadas</div>':'');})()+'</div></div><div class="plan-side"><div class="plan-side-title">Catequistas · Sacerdotes · Cocineros</div><div style="font-size:.68rem;color:var(--g4);margin-bottom:.5rem">Arrastrá directo a un micro</div><div id="plan-side-esp">'+esp.map(function(e){var z=PLAN_STATE.micros.especiales[e.dni],color=planColorParroquia(e.parroquia||''),initials=e.nombre.trim().split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();return '<div class="side-esp-card'+(z!=='sin'?' asignada':'')+'" id="sidesp-'+e.dni+'" draggable="'+(z==='sin'?'true':'false')+'"><div class="com-dot" style="background:'+color+';width:22px;height:22px;font-size:.6rem">'+initials+'</div><div style="flex:1;min-width:0"><div style="font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><div style="font-size:.66rem;color:var(--s)">'+esc(e.rol)+(z!=='sin'?' · Micro '+(z==='a'?'A':'B'):'')+'</div></div></div>';}).join('')+'</div></div></div>';$$('plan-vista-micros').innerHTML=html;planBindMicrosEvents();planActualizarStatsMicros();}
 function planMicrosToggleSel(dni){
   var idx=PLAN_MICROS_SELECCION.indexOf(dni);
   if(idx>=0)PLAN_MICROS_SELECCION.splice(idx,1);
@@ -3054,7 +2979,7 @@ function planMicrosToggleCom(dnis,ev){
   else{dnis.forEach(function(d){if(PLAN_MICROS_SELECCION.indexOf(d)<0)PLAN_MICROS_SELECCION.push(d);});}
   renderPlanMicros();
 }
-function planBindMicrosEvents(){planComunidades().forEach(function(c){var el=document.getElementById('comblock-'+c.id);if(!el)return;el.ondragstart=function(ev){if(PLAN_EXPANDIDOS[c.id])return false;PLAN_DRAGGING={tipo:'com',id:c.id};setTimeout(function(){el.classList.add('dragging');},0);};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};if(PLAN_EXPANDIDOS[c.id]){c.personas.forEach(function(p){var pill=document.getElementById('perpill-'+p.dni);if(!pill)return;pill.ondragstart=function(){var inSel=PLAN_MICROS_SELECCION.indexOf(p.dni)>=0;var ids=inSel&&PLAN_MICROS_SELECCION.length>0?PLAN_MICROS_SELECCION:[p.dni];PLAN_DRAGGING={tipo:'per',id:p.dni,ids:ids};pill.classList.add('dragging');};pill.ondragend=function(){pill.classList.remove('dragging');PLAN_DRAGGING=null;};});}});planEspeciales().forEach(function(e){var el=document.getElementById('espblock-'+e.dni)||document.getElementById('sidesp-'+e.dni);if(!el)return;el.ondragstart=function(){PLAN_DRAGGING={tipo:'esp',id:e.dni};setTimeout(function(){el.classList.add('dragging');},0);};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};});}
+function planBindMicrosEvents(){planComunidades().forEach(function(c){var el=document.getElementById('comblock-'+c.id);if(!el)return;el.ondragstart=function(ev){if(PLAN_EXPANDIDOS[c.id])return false;PLAN_DRAGGING={tipo:'com',id:c.id};setTimeout(function(){el.classList.add('dragging');},0);};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};if(PLAN_EXPANDIDOS[c.id]){c.personas.forEach(function(p){var pill=document.getElementById('perpill-'+p.dni);if(!pill)return;pill.ondragstart=function(){var ids=PLAN_MICROS_SELECCION.length>0?PLAN_MICROS_SELECCION:[p.dni];PLAN_DRAGGING={tipo:'per',id:p.dni,ids:ids};pill.classList.add('dragging');};pill.ondragend=function(){pill.classList.remove('dragging');PLAN_DRAGGING=null;};});}});planEspeciales().forEach(function(e){var el=document.getElementById('espblock-'+e.dni)||document.getElementById('sidesp-'+e.dni);if(!el)return;el.ondragstart=function(){PLAN_DRAGGING={tipo:'esp',id:e.dni};setTimeout(function(){el.classList.add('dragging');},0);};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};});}
 function planDzOver(e){e.preventDefault();e.currentTarget.classList.add('over');}
 function planDzLeave(e){e.currentTarget.classList.remove('over');}
 function planDzDrop(e,zona){
@@ -3070,12 +2995,7 @@ function planDzDrop(e,zona){
   PLAN_DRAGGING=null; renderPlanMicros();
 }
 function planToggleExpand(cid,ev){ev.stopPropagation();PLAN_EXPANDIDOS[cid]=!PLAN_EXPANDIDOS[cid];renderPlanMicros();}
-function planActualizarStatsMicros(){['a','b'].forEach(function(z){var el=$$('pstats-'+z);if(!el)return;var t=planTotalZona(z),ep=planEdadPromZona(z);var cap2=(PLAN_STATE.micros.capacidades&&PLAN_STATE.micros.capacidades[z])||59;var col=t>cap2?'var(--r)':t>Math.floor(cap2*0.85)?'var(--a)':'var(--g)';el.innerHTML='<span style="color:'+col+';font-weight:700">'+t+'</span>/'+cap2+' personas'+(ep?' · edad prom. '+ep:'');});var warn=$$('plan-warn-micros');if(!warn)return;var diff=Math.abs(planTotalZona('a')-planTotalZona('b'));if(diff>6&&(planTotalZona('a')>0||planTotalZona('b')>0)){warn.style.display='block';warn.textContent='Diferencia de '+diff+' personas entre micros.';}else warn.style.display='none';}
-function planSetCapMicro(zona,val){
-  if(!PLAN_STATE.micros.capacidades)PLAN_STATE.micros.capacidades={a:59,b:59};
-  PLAN_STATE.micros.capacidades[zona]=parseInt(val)||59;
-  renderPlanMicros();
-}
+function planActualizarStatsMicros(){['a','b'].forEach(function(z){var el=$$('pstats-'+z);if(!el)return;var t=planTotalZona(z),ep=planEdadPromZona(z),col=t>59?'var(--r)':t>50?'var(--a)':'var(--g)';el.innerHTML='<span style="color:'+col+';font-weight:700">'+t+'</span>/~59 personas'+(ep?' · edad prom. '+ep:'');});var warn=$$('plan-warn-micros');if(!warn)return;var diff=Math.abs(planTotalZona('a')-planTotalZona('b'));if(diff>6&&(planTotalZona('a')>0||planTotalZona('b')>0)){warn.style.display='block';warn.textContent='Diferencia de '+diff+' personas entre micros.';}else warn.style.display='none';}
 function planSugerirMicros(){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});PLAN_STATE.micros.personas={};planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});var ords=planComunidades().slice().sort(function(a,b){return b.personas.length-a.personas.length;}),ta=0,tb=0;ords.forEach(function(c){if(ta<=tb){PLAN_STATE.micros.comunidades[c.id]='a';ta+=c.personas.length;}else{PLAN_STATE.micros.comunidades[c.id]='b';tb+=c.personas.length;}});planEspeciales().forEach(function(e,i){PLAN_STATE.micros.especiales[e.dni]=i%2===0?'a':'b';});renderPlanMicros();}
 function planResetearMicros(){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});PLAN_STATE.micros.personas={};planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});PLAN_EXPANDIDOS={};renderPlanMicros();}
 function renderPlanHabitaciones(){
@@ -3105,7 +3025,7 @@ function renderPlanHabitaciones(){
     var nombre2=p.nombre.split(' ').slice(0,2).join(' ');
     if(enHab){
       return '<div class="hab-chip" draggable="true" id="habchip-'+p.dni+'">'+
-        '<span class="age-circle" style="background:'+color+'">'+(p.edad||'?')+'</span>'+
+        '<span class="age-circle" style="background:'+color+'">'+p.edad+'</span>'+
         esc(p.nombre.split(' ')[0]+' '+((p.nombre.split(' ')[1]||'').charAt(0)+(p.nombre.split(' ')[1]?'.':'')))+
         ' <span style="font-size:.66rem;color:var(--s)">'+esc((p.comunidad||'').split(' ')[0])+'</span>'+
         (esAdminEdicion()?'<span class="rm" onclick="planDevolverHab(\''+p.dni+'\')">×</span>':'')+
@@ -3160,10 +3080,9 @@ function renderPlanHabitaciones(){
   html+='<div class="hab-savebar">'+
     '<span class="hab-save-status" id="hab-save-status"></span>'+
     '<div class="plan-btns">'+
-      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitacionesAhora()">💾 Guardar</button>':'')+
-      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ CSV</button>'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 PDF</button>'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesWA()">📋 WhatsApp</button>'+
+      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitacionesAhora()">Guardar ahora</button>':'')+
+      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ Descargar lista</button>'+
+      '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 Imprimir</button>'+
     '</div>'+
   '</div>';
 
@@ -3325,7 +3244,7 @@ function planAsignarSeleccion(hid){
 function planBindHabEvents(){
   planTodasPersonas().filter(function(p){return p.sexo===PLAN_SEXO_HAB&&!(p.logisticaEspecial||'').includes('sin_alojamiento');}).forEach(function(p){
     var asig=PLAN_STATE.habitaciones.asignaciones[p.dni];
-    if(!asig){var el=document.getElementById('sidper-'+p.dni);if(!el)return;el.ondragstart=function(){var inSel=PLAN_HAB_SELECCION.indexOf(p.dni)>=0;var ids=inSel&&PLAN_HAB_SELECCION.length>0?PLAN_HAB_SELECCION:[p.dni];PLAN_DRAGGING={tipo:'per_hab',id:p.dni,sexo:p.sexo,ids:ids};el.classList.add('dragging');};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};}
+    if(!asig){var el=document.getElementById('sidper-'+p.dni);if(!el)return;el.ondragstart=function(){PLAN_DRAGGING={tipo:'per_hab',id:p.dni,sexo:p.sexo,ids:PLAN_HAB_SELECCION.length>0?PLAN_HAB_SELECCION:[p.dni]};el.classList.add('dragging');};el.ondragend=function(){el.classList.remove('dragging');PLAN_DRAGGING=null;};}
     else{var chip=document.getElementById('habchip-'+p.dni);if(!chip)return;chip.ondragstart=function(){PLAN_DRAGGING={tipo:'per_hab',id:p.dni,sexo:p.sexo,ids:[p.dni]};chip.classList.add('dragging');};chip.ondragend=function(){chip.classList.remove('dragging');PLAN_DRAGGING=null;};}
   });
   // Bind cajitas arrastrables
