@@ -508,8 +508,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
         </select>
         <select id="ins-fq" class="ins-sel" onchange="renderInscriptos()" title="Filtrar por cuotas confirmadas">
           <option value="">Todas las cuotas</option>
-          <option value="con_deuda">⚠ Tienen deuda</option>
-          <option value="sin_actualizaciones">Pagaron cuotas pero faltan actualizaciones</option>
           <option value="sin_sena">No pagaron seña</option>
           <option value="solo_sena">Solo seña confirmada</option>
           <option value="sena_debe_1ra">Pagó seña y debe 1ª</option>
@@ -1767,19 +1765,11 @@ function cuotasConfirmadasInscripto(ins){
 
 function aplicaFiltroCuotasInscripto(ins, fq){
   if(!fq) return true;
-  if(ins.rol==='Sacerdote'||ins.rol==='Cocinero') return fq==='con_deuda'?false:false;
-  if(ins.pagoCompletoManual) return fq==='pago_completo';
+  // Este filtro está pensado para el plan estándar (Jóvenes/Catequistas).
+  // Sacerdotes y cocineros tienen otro esquema de pago, así que quedan afuera de estos filtros específicos.
+  if(ins.rol==='Sacerdote'||ins.rol==='Cocinero') return false;
   var q = cuotasConfirmadasInscripto(ins);
   var tiene = function(k){ return q.indexOf(k) >= 0; };
-  var todasCuotas=CQ; // ['sena','1ra','2da','3ra','ajuste_ago','4ta','ajuste_sep']
-  var faltanCuotas=todasCuotas.filter(function(k){return !tiene(k);});
-  if(fq === 'con_deuda') return ins.estado!=='pago_completo'&&ins.estadoCupo!=='baja'&&faltanCuotas.length>0;
-  if(fq === 'sin_actualizaciones'){
-    // Pagaron cuotas principales pero les falta al menos una actualización
-    var tieneMain=tiene('sena')&&tiene('1ra')&&tiene('2da')&&tiene('3ra')&&tiene('4ta');
-    var faltaAct=!tiene('ajuste_ago')||!tiene('ajuste_sep');
-    return tieneMain&&faltaAct;
-  }
   if(fq === 'sin_sena') return !tiene('sena');
   if(fq === 'solo_sena') return tiene('sena') && !tiene('1ra') && !tiene('2da') && !tiene('3ra') && !tiene('4ta');
   if(fq === 'sena_debe_1ra') return tiene('sena') && !tiene('1ra');
@@ -1787,7 +1777,7 @@ function aplicaFiltroCuotasInscripto(ins, fq){
   if(fq === 'hasta_1ra_debe_2da') return tiene('sena') && tiene('1ra') && !tiene('2da');
   if(fq === 'hasta_2da_debe_3ra') return tiene('sena') && tiene('1ra') && tiene('2da') && !tiene('3ra');
   if(fq === 'hasta_3ra_debe_4ta') return tiene('sena') && tiene('1ra') && tiene('2da') && tiene('3ra') && !tiene('4ta');
-  if(fq === 'pago_completo') return ins.estado === 'pago_completo'||ins.pagoCompletoManual;
+  if(fq === 'pago_completo') return ins.estado === 'pago_completo';
   return true;
 }
 
@@ -1896,7 +1886,7 @@ function renderInscriptos(){
       '<td>'+ins.rol+'</td>'+
       '<td>'+cupo+'</td>'+
       '<td><span class="epill" style="background:'+eb+';color:'+ec+'">'+el+'</span></td>'+
-      '<td style="font-weight:600;color:var(--g)">$'+totalMostrado.toLocaleString('es-AR')+(function(){var fq2=$$('ins-fq')?$$('ins-fq').value:'';if((fq2==='con_deuda'||fq2==='sin_actualizaciones')&&ins.tipoPlan==='fijo'&&!ins.pagoCompletoManual){var q2=cuotasConfirmadasInscripto(ins);var plan2=ins.cuotasPlan||CQ.map(function(k){return{key:k,label:CL[k],monto:CM[k]};});var faltan=plan2.filter(function(c){return q2.indexOf(c.key)<0;});if(faltan.length){var total2=faltan.reduce(function(a,c){return a+c.monto;},0);return '<br><span style="font-size:.65rem;color:var(--r)">Debe: '+faltan.map(function(c){return c.label;}).join(', ')+'</span><span style="font-size:.65rem;color:var(--r);font-weight:700"> ($'+total2.toLocaleString('es-AR')+')</span>';}} return '';})()+'</td>'+
+      '<td style="font-weight:600;color:var(--g)">$'+totalMostrado.toLocaleString('es-AR')+'</td>'+
       '<td style="white-space:nowrap">'+(ins.edad!=null&&ins.edad<18?(esAdminEdicion()?'<span onclick="toggleDoc(\'' +ins.dni+ '\',\'autorizacion\',' +(ins.autorizacionEntregada?'true':'false')+ ')" style="cursor:pointer;font-size:1rem;user-select:none" title="Autorización">'+(ins.autorizacionEntregada?'✅':'⬜')+'</span>'+'<span onclick="toggleDoc(\'' +ins.dni+ '\',\'dniCopia\',' +(ins.dniCopiaEntregada?'true':'false')+ ')" style="cursor:pointer;font-size:1rem;user-select:none;margin-left:4px" title="Copia DNI">'+(ins.dniCopiaEntregada?'🪪':'⬜')+'</span>':(ins.autorizacionEntregada?'✅':'⬜')+(ins.dniCopiaEntregada?'🪪':'⬜')):'')+'</td>'+
       '<td>'+(menuItems?'<div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+menuId+'\')">···</button><div class="menu-drop" id="'+menuId+'">'+menuItems+'</div></div>':'<span style="color:var(--g4)">—</span>')+'</td>'+
     '</tr>';
