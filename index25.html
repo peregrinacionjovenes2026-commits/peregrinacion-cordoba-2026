@@ -784,24 +784,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--g1);min-height:100vh;colo
   </div>
 </div>
 
-<!-- MODAL EXPORTAR MICROS -->
-<div class="overlay" id="modal-export-micros" style="display:none" onclick="if(event.target===this)$$('modal-export-micros').style.display='none'">
-  <div class="modal" style="max-width:420px">
-    <h3>Exportar lista de micros</h3>
-    <p style="font-size:.82rem;color:var(--s);margin-bottom:.9rem">Elegí qué columnas incluir en el archivo.</p>
-    <div style="display:flex;gap:1rem;margin-bottom:.75rem">
-      <button class="bs bsm" style="margin-top:0;font-size:.72rem" onclick="planPresetEmpresa()">Preset empresa de micros</button>
-      <button class="bs bsm" style="margin-top:0;font-size:.72rem" onclick="planPresetInterno()">Preset uso interno</button>
-    </div>
-    <div id="export-micros-cols" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem"></div>
-    <div class="modal-btns">
-      <button class="bp" style="width:auto;margin-top:0" onclick="planExportarMicrosConCols('csv')">⬇ Descargar CSV</button>
-      <button class="bp" style="width:auto;margin-top:0;background:var(--r)" onclick="planExportarMicrosConCols('pdf')">🖨 Imprimir PDF</button>
-      <button class="bgr" onclick="$$('modal-export-micros').style.display='none'">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL PAGO LIBRE -->
 <div class="overlay" id="modal-pago-libre" style="display:none" onclick="if(event.target===this)cerrarModalPagoLibre()">
   <div class="modal" style="max-width:440px">
@@ -2990,130 +2972,6 @@ function planGuardarMicros(){
   planGuardarHabitacionesRemoto();
 }
 
-var MICROS_COLS_DEF=[
-  {key:'apellido_nombre',label:'Apellido y Nombre',default:true},
-  {key:'nombre',label:'Nombre',default:false},
-  {key:'apellido',label:'Apellido',default:false},
-  {key:'dni',label:'Número de documento',default:true},
-  {key:'menor',label:'Menor de edad (SI/vacío)',default:true},
-  {key:'nacionalidad',label:'Nacionalidad',default:true},
-  {key:'edad',label:'Edad',default:false},
-  {key:'celular',label:'Celular',default:false},
-  {key:'comunidad',label:'Comunidad',default:false},
-  {key:'parroquia',label:'Parroquia',default:false},
-  {key:'rol',label:'Rol',default:false},
-  {key:'micro',label:'Micro asignado',default:false},
-];
-var MICROS_COLS_SEL=null;
-
-function abrirModalExportMicros(){
-  if(!MICROS_COLS_SEL) MICROS_COLS_SEL=MICROS_COLS_DEF.filter(function(c){return c.default;}).map(function(c){return c.key;});
-  var cont=$$('export-micros-cols');
-  cont.innerHTML=MICROS_COLS_DEF.map(function(c){
-    var checked=MICROS_COLS_SEL.indexOf(c.key)>=0;
-    return '<label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;cursor:pointer">'+
-      '<input type="checkbox" value="'+c.key+'" '+(checked?'checked':'')+' onchange="planToggleExportCol(this)">'+
-      c.label+'</label>';
-  }).join('');
-  $$('modal-export-micros').style.display='flex';
-}
-
-function planToggleExportCol(el){
-  if(!MICROS_COLS_SEL) MICROS_COLS_SEL=[];
-  if(el.checked){if(MICROS_COLS_SEL.indexOf(el.value)<0)MICROS_COLS_SEL.push(el.value);}
-  else{MICROS_COLS_SEL=MICROS_COLS_SEL.filter(function(k){return k!==el.value;});}
-}
-
-function planPresetEmpresa(){
-  MICROS_COLS_SEL=['apellido_nombre','dni','menor','nacionalidad'];
-  abrirModalExportMicros();
-}
-function planPresetInterno(){
-  MICROS_COLS_SEL=['apellido_nombre','dni','edad','comunidad','parroquia','rol','micro'];
-  abrirModalExportMicros();
-}
-
-function getMicrosData(){
-  var todas=planTodasPersonas();
-  var micros={a:[],b:[]};
-  planComunidades().forEach(function(c){
-    var zona=PLAN_STATE.micros.comunidades[c.id];
-    c.personas.forEach(function(p){
-      var ps=PLAN_STATE.micros.personas[p.dni]||zona;
-      if(ps==='a'||ps==='b') micros[ps].push(p);
-    });
-  });
-  planEspeciales().forEach(function(e){
-    var z=PLAN_STATE.micros.especiales[e.dni];
-    if(z==='a'||z==='b') micros[z].push(e);
-  });
-  return micros;
-}
-
-function getValorColumna(p,key,micro){
-  var partes=p.nombre.trim().split(' ');
-  var nombre=partes[0]||'';
-  var apellido=partes.slice(1).join(' ')||'';
-  switch(key){
-    case 'apellido_nombre': return apellido+' '+nombre;
-    case 'nombre': return nombre;
-    case 'apellido': return apellido;
-    case 'dni': return p.dni||'';
-    case 'menor': return (p.edad!=null&&p.edad<18)?'SI':'';
-    case 'nacionalidad': return p.nacionalidad||'';
-    case 'edad': return p.edad!=null?p.edad:'';
-    case 'celular': return p.celular||'';
-    case 'comunidad': return p.comunidad||'';
-    case 'parroquia': return p.parroquia||'';
-    case 'rol': return p.rol||'';
-    case 'micro': return 'Micro '+(micro==='a'?'A':'B');
-    default: return '';
-  }
-}
-
-function getLabelColumna(key){
-  var c=MICROS_COLS_DEF.find(function(c){return c.key===key;});
-  return c?c.label:key;
-}
-
-function planExportarMicrosConCols(tipo){
-  $$('modal-export-micros').style.display='none';
-  var cols=MICROS_COLS_SEL&&MICROS_COLS_SEL.length?MICROS_COLS_SEL:['apellido_nombre','dni','menor','nacionalidad'];
-  var micros=getMicrosData();
-  var orden=[{key:'a',nombre:'Micro A'},{key:'b',nombre:'Micro B'}].filter(function(x){return micros[x.key].length>0;});
-  if(!orden.length){alert('No hay personas asignadas a los micros todavía.');return;}
-
-  if(tipo==='csv'){
-    var csv='\uFEFF'+cols.map(function(k){return '"'+getLabelColumna(k)+'"';}).join(',')+'\n';
-    orden.forEach(function(m){
-      micros[m.key].forEach(function(p){
-        csv+=cols.map(function(k){return '"'+String(getValorColumna(p,k,m.key)).replace(/"/g,'""')+'"';}).join(',')+'\n';
-      });
-    });
-    var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');a.href=url;a.download='micros_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.csv';a.click();
-    setTimeout(function(){URL.revokeObjectURL(url);},500);
-  } else if(tipo==='pdf'){
-    var w=window.open('','_blank');
-    if(!w){alert('Habilitá las ventanas emergentes.');return;}
-    var html='<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Micros — Peregrinación Córdoba 2026</title>'+
-      '<style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1a1f1a;font-size:11px}h1{font-size:18px;margin:0 0 4px}header{border-bottom:2px solid #1a5fa8;margin-bottom:14px;padding-bottom:6px}section{margin:0 0 16px;break-inside:avoid}.micro-title{display:flex;justify-content:space-between;align-items:end;background:#e8f0fc;border-left:4px solid #1a5fa8;padding:6px 9px;margin-bottom:0}.micro-title h2{font-size:14px;margin:0}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #dfe3df;padding:5px 7px;text-align:left}th{font-size:9px;text-transform:uppercase;color:#5a635a;background:#f7f8f7}</style>'+
-      '</head><body><header><h1>Distribución de micros</h1><p>Peregrinación Córdoba 2026 · '+new Date().toLocaleDateString('es-AR')+'</p></header>';
-    orden.forEach(function(m){
-      html+='<section><div class="micro-title"><h2>'+m.nombre+'</h2><span style="font-size:10px;color:#5a635a">'+micros[m.key].length+' personas</span></div>'+
-        '<table><thead><tr>'+cols.map(function(k){return '<th>'+getLabelColumna(k)+'</th>';}).join('')+'</tr></thead><tbody>'+
-        micros[m.key].map(function(p){
-          return '<tr>'+cols.map(function(k){return '<td>'+esc(String(getValorColumna(p,k,m.key)))+'</td>';}).join('')+'</tr>';
-        }).join('')+
-        '</tbody></table></section>';
-    });
-    html+='</body></html>';
-    w.document.write(html);w.document.close();
-    setTimeout(function(){w.print();},300);
-  }
-}
-
 function planExportarMicrosCSV(){
   var todas=planTodasPersonas();
   var rows=[];
@@ -3257,7 +3115,7 @@ function planRenderComBlock(c,zona){
     pillsHtml+
   '</div>';
 }
-function renderPlanMicros(){var coms=planComunidades(),esp=planEspeciales();var html='<div class="plan-toolbar"><div class="plan-subtitle">Arrastrá comunidades entre micros. Expandí ▾ para mover personas individuales.</div><div class="plan-btns">'+(esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirMicros()">✦ Sugerir distribución</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planResetearMicros()">↺ Reiniciar</button>'+(esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarMicros()">💾 Guardar</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="abrirModalExportMicros()">⬇ CSV / 🖨 PDF</button><button class="bs bsm" style="margin-top:0" onclick="planExportarMicrosWA()">📋 WhatsApp</button></div></div><div class="plan-warn" id="plan-warn-micros"></div><div style="display:flex;gap:.65rem;align-items:flex-start"><div style="flex:1;min-width:0"><div style="display:flex;gap:.65rem;margin-bottom:.65rem">'+planRenderMicroCol('a','Micro A','#1a5fa8')+planRenderMicroCol('b','Micro B','#1a7a56')+'</div>'+'<div class="plan-subtitle" style="margin-bottom:.3rem">Sin asignar</div>'+'<div class="plan-drop" id="pdrop-sin" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\'sin\')">'+(function(){var sc=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]==='sin';});var blocksHtml=sc.map(function(c){return planRenderComBlock(c,'sin');}).join('');return blocksHtml||(sc.length===0?'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Todas las comunidades están asignadas</div>':'');})()+'</div></div><div class="plan-side"><div class="plan-side-title">Catequistas · Sacerdotes · Cocineros</div><div style="font-size:.68rem;color:var(--g4);margin-bottom:.5rem">Arrastrá directo a un micro</div><div id="plan-side-esp">'+esp.map(function(e){var z=PLAN_STATE.micros.especiales[e.dni],color=planColorParroquia(e.parroquia||''),initials=e.nombre.trim().split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();return '<div class="side-esp-card'+(z!=='sin'?' asignada':'')+'" id="sidesp-'+e.dni+'" draggable="'+(z==='sin'?'true':'false')+'"><div class="com-dot" style="background:'+color+';width:22px;height:22px;font-size:.6rem">'+initials+'</div><div style="flex:1;min-width:0"><div style="font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><div style="font-size:.66rem;color:var(--s)">'+esc(e.rol)+(z!=='sin'?' · Micro '+(z==='a'?'A':'B'):'')+'</div></div></div>';}).join('')+'</div></div></div>';$$('plan-vista-micros').innerHTML=html;planBindMicrosEvents();planActualizarStatsMicros();}
+function renderPlanMicros(){var coms=planComunidades(),esp=planEspeciales();var html='<div class="plan-toolbar"><div class="plan-subtitle">Arrastrá comunidades entre micros. Expandí ▾ para mover personas individuales.</div><div class="plan-btns">'+(esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirMicros()">✦ Sugerir distribución</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planResetearMicros()">↺ Reiniciar</button>'+(esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarMicros()">💾 Guardar</button>':'')+'<button class="bs bsm" style="margin-top:0" onclick="planExportarMicrosCSV()">⬇ CSV</button><button class="bs bsm" style="margin-top:0" onclick="planImprimirMicros()">🖨 PDF</button><button class="bs bsm" style="margin-top:0" onclick="planExportarMicrosWA()">📋 WhatsApp</button></div></div><div class="plan-warn" id="plan-warn-micros"></div><div style="display:flex;gap:.65rem;align-items:flex-start"><div style="flex:1;min-width:0"><div style="display:flex;gap:.65rem;margin-bottom:.65rem">'+planRenderMicroCol('a','Micro A','#1a5fa8')+planRenderMicroCol('b','Micro B','#1a7a56')+'</div>'+'<div class="plan-subtitle" style="margin-bottom:.3rem">Sin asignar</div>'+'<div class="plan-drop" id="pdrop-sin" ondragover="planDzOver(event)" ondragleave="planDzLeave(event)" ondrop="planDzDrop(event,\'sin\')">'+(function(){var sc=coms.filter(function(c){return PLAN_STATE.micros.comunidades[c.id]==='sin';});var blocksHtml=sc.map(function(c){return planRenderComBlock(c,'sin');}).join('');return blocksHtml||(sc.length===0?'<div style="font-size:.72rem;color:var(--g4);text-align:center;padding:.4rem">Todas las comunidades están asignadas</div>':'');})()+'</div></div><div class="plan-side"><div class="plan-side-title">Catequistas · Sacerdotes · Cocineros</div><div style="font-size:.68rem;color:var(--g4);margin-bottom:.5rem">Arrastrá directo a un micro</div><div id="plan-side-esp">'+esp.map(function(e){var z=PLAN_STATE.micros.especiales[e.dni],color=planColorParroquia(e.parroquia||''),initials=e.nombre.trim().split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();return '<div class="side-esp-card'+(z!=='sin'?' asignada':'')+'" id="sidesp-'+e.dni+'" draggable="'+(z==='sin'?'true':'false')+'"><div class="com-dot" style="background:'+color+';width:22px;height:22px;font-size:.6rem">'+initials+'</div><div style="flex:1;min-width:0"><div style="font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.nombre.split(' ').slice(0,2).join(' '))+'</div><div style="font-size:.66rem;color:var(--s)">'+esc(e.rol)+(z!=='sin'?' · Micro '+(z==='a'?'A':'B'):'')+'</div></div></div>';}).join('')+'</div></div></div>';$$('plan-vista-micros').innerHTML=html;planBindMicrosEvents();planActualizarStatsMicros();}
 function planMicrosToggleSel(dni){
   var idx=PLAN_MICROS_SELECCION.indexOf(dni);
   if(idx>=0)PLAN_MICROS_SELECCION.splice(idx,1);
