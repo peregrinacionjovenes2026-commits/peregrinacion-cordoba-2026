@@ -2800,9 +2800,6 @@ function renderContabilidad(){
 var PLAN_STATE={micros:{comunidades:{},personas:{},especiales:{},capacidades:{a:59,b:59}},habitaciones:{lista:[],asignaciones:{}},subgrupos:{a:[],b:[]}};
 var PLAN_EXPANDIDOS={},PLAN_DRAGGING=null,PLAN_VISTA_ACTUAL='micros',PLAN_SEXO_HAB='Mujer',PLAN_HAB_COUNT=0,PLAN_INICIALIZADO=false;
 var PLAN_HAB_SELECCION=[];
-var PLAN_HAB_ACTIVA=null;
-
-function planHabActivar(hid){PLAN_HAB_ACTIVA=hid;renderPlanHabitaciones();}
 var PLAN_MICROS_SELECCION=[];
 var PLAN_HAB_GUARDADO_EN='',PLAN_HAB_GUARDADO_OK=true,PLAN_HAB_SYNC='local',PLAN_HAB_SAVE_TIMER=null,PLAN_HAB_CARGA_REMOTA=false;
 var PLAN_PARR_COLORES={},PLAN_PARR_LISTA=['#1a5fa8','#1a7a56','#d4820a','#b83232','#6b4ea0','#2a7a8a'];
@@ -3053,9 +3050,7 @@ function planImprimirHabitaciones(){
 }
 function planComunidades(){if(!inscriptosData||!inscriptosData.ok)return [];var mapa={};planTodasPersonas().filter(function(i){return i.rol==='Participante'&&!(i.logisticaEspecial||'').includes('sin_micro');}).forEach(function(i){var c=(i.comunidad||'Sin comunidad').trim()||'Sin comunidad',p=(i.parroquia||'Sin parroquia').trim()||'Sin parroquia';var key=c+'___'+p;if(!mapa[key])mapa[key]={id:'c_'+key.replace(/[^a-zA-Z0-9]/g,'_'),nombre:c,parroquia:p,color:planColorParroquia(p),personas:[]};mapa[key].personas.push(i);});return Object.values(mapa).sort(function(a,b){return b.personas.length-a.personas.length;});}
 function planEspeciales(){if(!inscriptosData||!inscriptosData.ok)return [];return planTodasPersonas().filter(function(i){return (i.rol==='Sacerdote'||i.rol==='Cocinero'||i.rol==='Catequista')&&!(i.logisticaEspecial||'').includes('sin_micro');});}
-async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();await planCargarHabitacionesRemoto();
-    if(PLAN_STATE.habitaciones.lista&&PLAN_STATE.habitaciones.lista.length)PLAN_HAB_ACTIVA=PLAN_STATE.habitaciones.lista[0].id;
-    PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
+async function inicializarPlanificacion(){if(!inscriptosData||!inscriptosData.ok){$$('plan-load').style.display='flex';await cargarInscriptos();$$('plan-load').style.display='none';}if(!PLAN_INICIALIZADO){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});planCargarHabitaciones();await planCargarHabitacionesRemoto();PLAN_INICIALIZADO=true;}planCambiarVista(PLAN_VISTA_ACTUAL);}
 function planCambiarVista(v){PLAN_VISTA_ACTUAL=v;['micros','habitaciones','subgrupos'].forEach(function(tab){$$('plan-tab-'+tab).classList.toggle('active',tab===v);$$('plan-vista-'+tab).style.display=tab===v?'block':'none';});if(v==='micros')renderPlanMicros();else if(v==='habitaciones')renderPlanHabitaciones();else if(v==='subgrupos')renderPlanSubgrupos();}
 function planTotalZona(zona){var coms=planComunidades(),esp=planEspeciales(),t=0;coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if(!ps||ps===zona)t++;});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona)t++;});});esp.forEach(function(e){if(PLAN_STATE.micros.especiales[e.dni]===zona)t++;});return t;}
 function planEdadPromZona(zona){var coms=planComunidades(),edades=[];coms.forEach(function(c){if(PLAN_STATE.micros.comunidades[c.id]===zona){c.personas.forEach(function(p){var ps=PLAN_STATE.micros.personas[p.dni];if((!ps||ps===zona)&&p.edad!=null)edades.push(p.edad);});}c.personas.forEach(function(p){if(PLAN_STATE.micros.personas[p.dni]===zona&&PLAN_STATE.micros.comunidades[c.id]!==zona&&p.edad!=null)edades.push(p.edad);});});if(!edades.length)return null;return Math.round(edades.reduce(function(a,b){return a+b;},0)/edades.length);}
@@ -3133,182 +3128,177 @@ function planSugerirMicros(){planComunidades().forEach(function(c){PLAN_STATE.mi
 function planResetearMicros(){planComunidades().forEach(function(c){PLAN_STATE.micros.comunidades[c.id]='sin';});PLAN_STATE.micros.personas={};planEspeciales().forEach(function(e){PLAN_STATE.micros.especiales[e.dni]='sin';});PLAN_EXPANDIDOS={};renderPlanMicros();}
 function renderPlanHabitaciones(){
   var sexo=PLAN_SEXO_HAB;
-  var todas=planTodasPersonas();
+  var todasPersonas=planTodasPersonas();
 
-  // Pool: personas del sexo actual sin sin_alojamiento, agrupadas por comunidad/rol
-  function getPool(){
-    var pers=todas.filter(function(p){
-      return (p.sexo===sexo||p.sexo==='Sin dato'||!p.sexo)&&
-             !(p.logisticaEspecial||'').includes('sin_alojamiento');
+  // Agrupar personas del sexo actual por categoría, excluyendo sin_alojamiento
+  function gruposPool(){
+    var pers=todasPersonas.filter(function(p){return p.sexo===sexo&&!(p.logisticaEspecial||'').includes('sin_alojamiento');});
+    // Por comunidad (solo jóvenes — Participante)
+    var comunMap={};
+    pers.filter(function(p){return p.rol==='Participante';}).forEach(function(p){
+      var c=(p.comunidad||'Sin comunidad').trim()||'Sin comunidad';
+      var par=(p.parroquia||'Sin parroquia').trim()||'Sin parroquia';
+      var key=c+'|'+par;
+      if(!comunMap[key])comunMap[key]={nombre:c,parroquia:par,color:planColorParroquia(par),personas:[]};
+      comunMap[key].personas.push(p);
     });
-    var groups={};
-    pers.forEach(function(p){
-      var g=(p.rol==='Participante'?(p.comunidad||'Sin comunidad')+'·'+(p.parroquia||''):p.rol);
-      if(!groups[g])groups[g]={label:p.rol==='Participante'?(p.comunidad||'Sin comunidad')+' · '+(p.parroquia||'Sin parroquia'):p.rol,personas:[]};
-      groups[g].personas.push(p);
-    });
-    return groups;
+    var catequistas=pers.filter(function(p){return p.rol==='Catequista';});
+    var cocineros=pers.filter(function(p){return p.rol==='Cocinero';});
+    var sacerdotes=pers.filter(function(p){return p.rol==='Sacerdote';});
+    return {comunidades:Object.values(comunMap),catequistas:catequistas,cocineros:cocineros,sacerdotes:sacerdotes};
   }
 
-  function chipHab(p,hid){
+  function chipPersona(p,enHab){
     var color=planColorParroquia(p.parroquia||'');
-    return '<div class="hab-chip" draggable="true" id="habchip-'+p.dni+'">'+
-      '<span class="age-circle" style="background:'+color+'">'+( p.edad||'?')+'</span>'+
-      esc(p.nombre.split(' ')[0]+' '+((p.nombre.split(' ')[1]||'').charAt(0)+(p.nombre.split(' ')[1]?'.':'')))+
-      ' <span style="font-size:.62rem;color:var(--s)">'+esc((p.comunidad||p.rol||'').split(' ')[0])+'</span>'+
-      (esAdminEdicion()?'<span class="rm" onclick="planDevolverHab(\''+p.dni+'\')">×</span>':'')+
+    var nombre2=p.nombre.split(' ').slice(0,2).join(' ');
+    if(enHab){
+      return '<div class="hab-chip" draggable="true" id="habchip-'+p.dni+'">'+
+        '<span class="age-circle" style="background:'+color+'">'+(p.edad||'?')+'</span>'+
+        esc(p.nombre.split(' ')[0]+' '+((p.nombre.split(' ')[1]||'').charAt(0)+(p.nombre.split(' ')[1]?'.':'')))+
+        ' <span style="font-size:.66rem;color:var(--s)">'+esc((p.comunidad||'').split(' ')[0])+'</span>'+
+        (esAdminEdicion()?'<span class="rm" onclick="planDevolverHab(\''+p.dni+'\')">×</span>':'')+
+      '</div>';
+    }
+    var asig=PLAN_STATE.habitaciones.asignaciones[p.dni];
+    var selec=PLAN_HAB_SELECCION.indexOf(p.dni)>=0;
+    return '<div class="sid-per'+(asig?' asignada':'')+(selec?' hab-sel':'')+'" id="sidper-'+p.dni+
+      '" draggable="'+(asig?'false':'true')+'" title="'+esc(p.nombre)+'"'+
+      (asig?'':' onclick="planHabToggleSel(\''+p.dni+'\')"')+'>'+
+      '<div class="com-dot" style="background:'+color+';width:22px;height:22px;font-size:.68rem;flex-shrink:0">'+p.edad+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(nombre2)+'</div>'+
+        (asig?'<div style="font-size:.62rem;color:var(--g)">✓ asignada</div>':
+         selec?'<div style="font-size:.62rem;color:var(--b)">✓ seleccionada</div>':'')+
+      '</div>'+
     '</div>';
   }
 
-  var habsFiltradas=PLAN_STATE.habitaciones.lista.filter(function(h){return !h.sexo||h.sexo===sexo;});
-  var grupos=getPool();
-  var sinAsignar=todas.filter(function(p){
-    return (p.sexo===sexo||p.sexo==='Sin dato'||!p.sexo)&&
-           !(p.logisticaEspecial||'').includes('sin_alojamiento')&&
-           !PLAN_STATE.habitaciones.asignaciones[p.dni];
-  }).length;
+  function cajita(titulo,personas,colorTitulo){
+    if(!personas.length) return '';
+    var sinAsig=personas.filter(function(p){return !PLAN_STATE.habitaciones.asignaciones[p.dni];});
+    if(!sinAsig.length) return '';
+    var dnisSinAsig=sinAsig.map(function(p){return p.dni;});
+    var todosSelec=dnisSinAsig.every(function(d){return PLAN_HAB_SELECCION.indexOf(d)>=0;});
+    return '<div class="hab-cajita" draggable="true" id="cajita-'+dnisSinAsig.join('_')+'" data-dnis="'+esc(JSON.stringify(dnisSinAsig))+'">'+
+      '<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem;cursor:pointer" onclick="planHabToggleCajita('+JSON.stringify(dnisSinAsig)+')">'+
+        '<div style="font-size:.72rem;font-weight:700;color:'+(colorTitulo||'var(--t)')+'">'+esc(titulo)+'</div>'+
+        '<span style="font-size:.66rem;color:var(--g4);">('+sinAsig.length+')</span>'+
+        '<span style="margin-left:auto;font-size:.66rem;color:'+(todosSelec?'var(--b)':'var(--g4)')+'">'+
+          (todosSelec?'✓ todas sel.':'seleccionar todas')+
+        '</span>'+
+      '</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:.3rem">'+
+        sinAsig.map(function(p){return chipPersona(p,false);}).join('')+
+      '</div>'+
+    '</div>';
+  }
 
-  var html='<div class="hab-savebar">'+
-    '<span class="hab-save-status" id="hab-save-status"></span>'+
-    '<div class="plan-btns">'+
+  var grupos=gruposPool();
+  var html='<div class="plan-toolbar">'+
+    '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">'+
       '<button class="'+(sexo==='Mujer'?'bp bsm':'bs bsm')+'" style="margin-top:0" onclick="planSetSexoHab(\'Mujer\')">Mujeres</button>'+
       '<button class="'+(sexo==='Varón'?'bp bsm':'bs bsm')+'" style="margin-top:0" onclick="planSetSexoHab(\'Varón\')">Varones</button>'+
-      (esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirHab()">✦ Sugerir</button>':'')+
-      '<button class="bs bsm" style="margin-top:0" onclick="planLimpiarHab()">↺ Limpiar</button>'+
-      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitacionesAhora()">💾 Guardar</button>':'')+
-      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ CSV</button>'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 PDF</button>'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesWA()">📋 WA</button>'+
+    '</div>'+
+    '<div class="plan-btns">'+
+      (esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planSugerirHab()">✦ Sugerir asignación</button>':'')+
+      (esAdminEdicion()?'<button class="bs bsm" style="margin-top:0" onclick="planLimpiarHab()">↺ Limpiar personas</button>':'')+
     '</div>'+
   '</div>';
 
+  html+='<div class="hab-savebar">'+
+    '<span class="hab-save-status" id="hab-save-status"></span>'+
+    '<div class="plan-btns">'+
+      (esAdminEdicion()?'<button class="bp bsm" style="margin-top:0" onclick="planGuardarHabitacionesAhora()">💾 Guardar</button>':'')+
+      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesCSV()">⬇ CSV</button>'+
+      '<button class="bs bsm" style="margin-top:0" onclick="planImprimirHabitaciones()">🖨 PDF</button>'+
+      '<button class="bs bsm" style="margin-top:0" onclick="planExportarHabitacionesWA()">📋 WhatsApp</button>'+
+    '</div>'+
+  '</div>';
+
+  // Setup habitaciones
   if(esAdminEdicion()){
-    html+='<div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.6rem;flex-wrap:wrap">'+
-      '<input type="text" id="hab-nombre-nuevo" placeholder="Nombre de habitación" style="flex:1;min-width:120px">'+
-      '<input type="number" id="hab-cap-nuevo" min="1" max="50" value="8" style="width:60px" title="Capacidad">'+
-      '<button class="bs bsm" style="margin-top:0" onclick="planAgregarHab()">+ Agregar</button>'+
+    html+='<div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">'+
+      '<input type="text" id="hab-nombre-nuevo" placeholder="Nombre (ej: Habitación 1)" style="flex:1;min-width:130px">'+
+      '<input type="number" id="hab-cap-nuevo" min="1" max="50" value="8" style="width:70px" title="Capacidad">'+
+      '<button class="bs bsm" style="margin-top:0" onclick="planAgregarHab()">+ Agregar habitación</button>'+
     '</div>';
   }
 
-  if(sinAsignar>0&&habsFiltradas.length>0){
-    html+='<div class="plan-warn" style="display:block">'+sinAsignar+' persona'+(sinAsignar>1?'s':'')+' sin habitación asignada.</div>';
+  html+='<div class="plan-warn" id="plan-warn-hab"></div>';
+  // Banner de selección activa
+  if(PLAN_HAB_SELECCION.length>0){
+    html+='<div style="background:var(--bl);border:1px solid var(--b);border-radius:var(--rs);padding:.4rem .7rem;font-size:.76rem;color:var(--b);margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem">'+
+      '<strong>'+PLAN_HAB_SELECCION.length+' persona'+(PLAN_HAB_SELECCION.length>1?'s':'')+' seleccionada'+(PLAN_HAB_SELECCION.length>1?'s':'')+'</strong> — arrastrá cualquiera de ellas a una habitación para moverlas todas'+
+      '<button class="bs bsm" style="margin:0 0 0 auto;padding:2px 8px" onclick="PLAN_HAB_SELECCION=[];renderPlanHabitaciones()">Limpiar selección</button>'+
+    '</div>';
   }
-
-  // Layout de dos paneles fijos
-  html+='<div style="display:flex;gap:10px;height:560px">';
+  html+='<div style="display:flex;gap:.75rem;align-items:flex-start">';
 
   // Panel izquierdo: habitaciones
-  html+='<div style="flex:1;min-width:0;display:flex;flex-direction:column;border:0.5px solid var(--g2);border-radius:12px;overflow:hidden">'+
-    '<div style="padding:8px 12px;border-bottom:0.5px solid var(--g2);background:var(--g1);font-size:.76rem;font-weight:600;flex-shrink:0">Habitaciones</div>'+
-    '<div style="overflow-y:auto;flex:1" id="plan-hab-inner">';
-
-  if(!habsFiltradas.length){
-    html+='<div style="text-align:center;padding:2rem;color:var(--g4);font-size:.85rem">Agregá habitaciones arriba para empezar</div>';
+  html+='<div style="flex:1;min-width:0">';
+  if(!PLAN_STATE.habitaciones.lista.length){
+    html+='<div style="text-align:center;padding:2rem;color:var(--g4);font-size:.85rem;border:1.5px dashed var(--g3);border-radius:var(--rr)">Agregá habitaciones para empezar</div>';
   } else {
-    habsFiltradas.forEach(function(h){
-      var ocupantes=todas.filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;});
+    PLAN_STATE.habitaciones.lista.forEach(function(h){
+      var sexoHab=h.sexo||'';
+      // Solo mostrar esta habitación si es del sexo actual o está vacía
+      if(sexoHab&&sexoHab!==sexo) return;
+      var todasOcupantes=planTodasPersonas().filter(function(p){return PLAN_STATE.habitaciones.asignaciones[p.dni]===h.id;});
+      var ocupantes=todasOcupantes;
       var llena=ocupantes.length>=h.capacidad;
-      var activa=PLAN_HAB_ACTIVA===h.id;
-      var colBadge=llena?'var(--r)':ocupantes.length===0?'var(--g4)':'var(--g)';
-      var bgBadge=llena?'var(--rl)':ocupantes.length===0?'var(--g2)':'var(--gl)';
-      var sexoBadge=h.sexo?('<span style="font-size:.6rem;padding:1px 5px;border-radius:20px;background:'+(h.sexo==='Mujer'?'var(--al)':'var(--bl)')+';color:'+(h.sexo==='Mujer'?'var(--a)':'var(--b)')+'">'+h.sexo+'</span>'):'';
+      var col=llena?'var(--r)':ocupantes.length===0?'var(--g4)':'var(--g)';
+      var chips=ocupantes.map(function(p){return chipPersona(p,true);}).join('');
       var edadesArr=ocupantes.map(function(p){return p.edad;}).filter(Boolean).sort(function(a,b){return a-b;});
       var edadProm=edadesArr.length?Math.round(edadesArr.reduce(function(a,b){return a+b;},0)/edadesArr.length):null;
       var comunsStr=ocupantes.map(function(p){return p.comunidad||'?';}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' · ');
-
-      html+='<div style="border-bottom:0.5px solid var(--g2);cursor:pointer;'+(activa?'background:var(--gl)':'')+'" onclick="planHabActivar(\''+h.id+'\')">';
-      // Header
-      html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 12px">'+
-        '<span style="font-size:.8rem;font-weight:600;flex:1">'+esc(h.nombre)+' '+sexoBadge+'</span>'+
-        '<span style="font-size:.7rem;font-weight:600;padding:1px 6px;border-radius:20px;background:'+bgBadge+';color:'+colBadge+'">'+ocupantes.length+'/'+h.capacidad+'</span>'+
-        (esAdminEdicion()?'<input type="number" value="'+h.capacidad+'" min="1" max="50" style="width:40px;font-size:.68rem;padding:1px 3px;border:0.5px solid var(--g2);border-radius:4px" onclick="event.stopPropagation()" onchange="planCambiarCapHab(\''+h.id+'\',this.value)">':'')+
-        (esAdminEdicion()?'<button onclick="event.stopPropagation();planLimpiarHabSola(\''+h.id+'\')" style="color:var(--s);background:none;border:none;cursor:pointer;font-size:.72rem" title="Limpiar">↺</button>':'')+
-        (esAdminEdicion()?'<button onclick="event.stopPropagation();planEliminarHab(\''+h.id+'\')" style="color:var(--r);background:none;border:none;cursor:pointer;font-size:.72rem">✕</button>':'')+
+      var sexoBadge=sexoHab?('<span style="font-size:.66rem;padding:1px 6px;border-radius:20px;background:'+(sexoHab==='Mujer'?'#fef3dc':'#e8f0fc')+';color:'+(sexoHab==='Mujer'?'var(--a)':'var(--b)')+'">'+sexoHab+'</span>'):'';
+      html+='<div class="hab-card" style="margin-bottom:.5rem">'+
+        '<div class="hab-card-header">'+
+          '<div class="hab-card-title">'+esc(h.nombre)+' '+sexoBadge+'</div>'+
+          '<span class="hab-cap-badge" style="color:'+col+';background:'+(llena?'var(--rl)':ocupantes.length===0?'var(--g2)':'var(--gl)')+'">'+ocupantes.length+'/'+h.capacidad+'</span>'+
+          (esAdminEdicion()?'<input type="number" value="'+h.capacidad+'" min="1" max="50" style="width:44px;font-size:.72rem;padding:2px 4px;border:1px solid var(--g2);border-radius:4px" onchange="planCambiarCapHab(\''+h.id+'\',this.value)">':'')+
+          (esAdminEdicion()?'<button onclick="planLimpiarHabSola(\''+h.id+'\')" style="color:var(--s);background:none;border:none;cursor:pointer;font-size:.72rem;padding:0 4px" title="Limpiar habitación">↺</button>':'')+
+          (esAdminEdicion()?'<button onclick="planEliminarHab(\''+h.id+'\')" style="color:var(--r);background:none;border:none;cursor:pointer;font-size:.8rem">✕</button>':'')+
+        '</div>'+
+        '<div class="hab-drop'+(llena?' llena':'')+'" id="habdrop-'+h.id+'" ondragover="planHabOver(event)" ondragleave="planHabLeave(event)" ondrop="planHabDrop(event,\''+h.id+'\')">'+
+          (chips||'<span style="font-size:.72rem;color:var(--g4);padding:.3rem">Arrastrá personas aquí</span>')+
+        '</div>'+
+        (ocupantes.length?'<div class="hab-footer">'+
+          '<span>Edades: '+edadesArr.join(', ')+'</span>'+
+          (edadProm?'<span>Prom. <strong>'+edadProm+'</strong></span>':'')+
+          (comunsStr?'<span>'+esc(comunsStr)+'</span>':'')+
+        '</div>':'')+
       '</div>';
-
-      if(activa){
-        // Chips de ocupantes
-        if(ocupantes.length){
-          html+='<div style="display:flex;flex-wrap:wrap;gap:4px;padding:0 12px 6px">'+
-            ocupantes.map(function(p){return chipHab(p,h.id);}).join('')+
-          '</div>';
-          if(edadesArr.length){
-            html+='<div style="font-size:.65rem;color:var(--s);padding:0 12px 5px">'+
-              'Edades: '+edadesArr.join(', ')+(edadProm?' · Prom. '+edadProm:'')+( comunsStr?' · '+esc(comunsStr):'')+
-            '</div>';
-          }
-        }
-        // Drop zone
-        if(!llena){
-          html+='<div class="hab-drop" id="habdrop-'+h.id+'" ondragover="planHabOver(event)" ondragleave="planHabLeave(event)" ondrop="planHabDrop(event,\''+h.id+'\')">'+
-            '<span style="font-size:.7rem;color:var(--g4)">Arrastrá aquí · '+(h.capacidad-ocupantes.length)+' lugares libres</span>'+
-          '</div>';
-        } else {
-          html+='<div style="padding:4px 12px 8px;font-size:.7rem;color:var(--r);font-weight:500">Habitación completa</div>';
-        }
-      } else if(ocupantes.length){
-        // Vista colapsada: solo nombres en una línea
-        html+='<div style="padding:0 12px 6px;font-size:.68rem;color:var(--s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
-          esc(ocupantes.map(function(p){return p.nombre.split(' ')[0];}).join(', '))+
-        '</div>';
-      } else {
-        html+='<div style="padding:0 12px 6px;font-size:.68rem;color:var(--g4)">Vacía — hacé clic para asignar personas</div>';
-      }
-      html+='</div>';
     });
   }
-  html+='</div></div>';
+  html+='</div>';
 
-  // Panel derecho: pool sticky
-  html+='<div style="width:200px;flex-shrink:0;display:flex;flex-direction:column;border:0.5px solid var(--g2);border-radius:12px;overflow:hidden">'+
-    '<div style="padding:8px 12px;border-bottom:0.5px solid var(--g2);background:var(--g1);flex-shrink:0">'+
-      '<div style="font-size:.76rem;font-weight:600">'+(sexo==='Mujer'?'Mujeres':'Varones')+' sin asignar</div>'+
-      '<div style="font-size:.68rem;color:var(--g4)">'+sinAsignar+' personas</div>'+
-    '</div>'+
-    '<div style="overflow-y:auto;flex:1;padding:6px" id="hab-pool-inner">';
+  // Panel derecho: pool por cajitas
+  html+='<div style="width:220px;flex-shrink:0;max-height:600px;overflow-y:auto">';
+  html+='<div style="font-size:.74rem;font-weight:700;color:var(--s);margin-bottom:.5rem">'+sexo+'s sin asignar</div>';
 
-  // Selección activa banner
-  if(PLAN_HAB_SELECCION.length){
-    html+='<div style="background:var(--bl);border:0.5px solid var(--b);border-radius:6px;padding:4px 8px;font-size:.68rem;color:var(--b);margin-bottom:5px;display:flex;align-items:center;gap:4px">'+
-      '<strong>'+PLAN_HAB_SELECCION.length+' sel.</strong>'+
-      '<span style="margin-left:auto;cursor:pointer;color:var(--b)" onclick="PLAN_HAB_SELECCION=[];renderPlanHabitaciones()">✕</span>'+
-    '</div>';
-  }
-
-  Object.keys(grupos).forEach(function(key){
-    var g=grupos[key];
-    var sinAsigG=g.personas.filter(function(p){return !PLAN_STATE.habitaciones.asignaciones[p.dni];});
-    if(!sinAsigG.length)return;
-    var dnis=sinAsigG.map(function(p){return p.dni;});
-    var todosSelec=dnis.every(function(d){return PLAN_HAB_SELECCION.indexOf(d)>=0;});
-    html+='<div class="hab-cajita" draggable="true" id="cajita-'+key.replace(/[^a-z0-9]/gi,'_')+'" data-dnis="'+esc(JSON.stringify(dnis))+'">'+
-      '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;cursor:pointer" onclick="planHabToggleCajita('+JSON.stringify(dnis)+')">'+
-        '<span style="font-size:.68rem;font-weight:600;color:var(--t);flex:1;line-height:1.3">'+esc(g.label)+'</span>'+
-        '<span style="font-size:.6rem;color:'+(todosSelec?'var(--b)':'var(--g4)')+';white-space:nowrap">'+(todosSelec?'✓ todas':'sel. todas')+'</span>'+
-      '</div>'+
-      sinAsigG.map(function(p){
-        var color=planColorParroquia(p.parroquia||'');
-        var selec=PLAN_HAB_SELECCION.indexOf(p.dni)>=0;
-        return '<div class="sid-per'+(selec?' hab-sel':'')+'" id="sidper-'+p.dni+'" draggable="true" onclick="planHabToggleSel(\''+p.dni+'\')" style="margin-bottom:3px">'+
-          '<div class="com-dot" style="background:'+color+';width:20px;height:20px;font-size:.6rem;flex-shrink:0">'+(p.edad||'?')+'</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.nombre.split(' ').slice(0,2).join(' '))+'</div>'+
-          '</div>'+
-        '</div>';
-      }).join('')+
-    '</div>';
+  // Cajitas por comunidad
+  grupos.comunidades.forEach(function(g){
+    html+=cajita(g.nombre+' · '+g.parroquia,g.personas,planColorParroquia(g.parroquia));
   });
+  // Cajita catequistas (si son del sexo actual)
+  var catSexo=grupos.catequistas; // ya filtrado por sexo
+  if(catSexo.length) html+=cajita('Catequistas',catSexo,'var(--b)');
+  // Cajita cocineros
+  if(grupos.cocineros.length) html+=cajita('Cocineros',grupos.cocineros,'var(--a)');
+  // Cajita sacerdotes (sin filtro sexo, van donde corresponda)
+  if(grupos.sacerdotes.length) html+=cajita('Sacerdotes',grupos.sacerdotes,'var(--r)');
 
-  html+='</div></div>';
+  html+='</div>';
   html+='</div>';
 
   $$('plan-vista-habitaciones').innerHTML=html;
   planBindHabEvents();
+  planActualizarWarnHab();
+  planActualizarEstadoGuardado();
 }
-
-
 function planSetSexoHab(s){PLAN_SEXO_HAB=s;PLAN_HAB_SELECCION=[];planGuardarHabitaciones();renderPlanHabitaciones();}
-function planAgregarHab(){var nombre=($$('hab-nombre-nuevo')&&$$('hab-nombre-nuevo').value.trim())||'Habitación '+(PLAN_HAB_COUNT+1),cap=parseInt(($$('hab-cap-nuevo')&&$$('hab-cap-nuevo').value)||8)||8;PLAN_HAB_COUNT++;var newId='h'+PLAN_HAB_COUNT;PLAN_STATE.habitaciones.lista.push({id:newId,nombre:nombre,capacidad:cap,sexo:''});if(!PLAN_HAB_ACTIVA)PLAN_HAB_ACTIVA=newId;planGuardarHabitaciones();renderPlanHabitaciones();}
+function planAgregarHab(){var nombre=($$('hab-nombre-nuevo')&&$$('hab-nombre-nuevo').value.trim())||'Habitación '+(PLAN_HAB_COUNT+1),cap=parseInt(($$('hab-cap-nuevo')&&$$('hab-cap-nuevo').value)||8)||8;PLAN_HAB_COUNT++;PLAN_STATE.habitaciones.lista.push({id:'h'+PLAN_HAB_COUNT,nombre:nombre,capacidad:cap,sexo:''});planGuardarHabitaciones();renderPlanHabitaciones();}
 function planEliminarHab(hid){planTodasPersonas().forEach(function(p){if(PLAN_STATE.habitaciones.asignaciones[p.dni]===hid)delete PLAN_STATE.habitaciones.asignaciones[p.dni];});PLAN_STATE.habitaciones.lista=PLAN_STATE.habitaciones.lista.filter(function(h){return h.id!==hid;});planGuardarHabitaciones();renderPlanHabitaciones();}
 function planCambiarCapHab(hid,val){var h=PLAN_STATE.habitaciones.lista.find(function(h){return h.id===hid;});if(h)h.capacidad=parseInt(val)||1;planGuardarHabitaciones();renderPlanHabitaciones();}
 function planDevolverHab(pid){
