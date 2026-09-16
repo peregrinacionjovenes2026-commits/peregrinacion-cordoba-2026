@@ -1379,9 +1379,9 @@ function renderAdmin(){
   });
   var pendientesPago=pendientesDePagoCantidad(personas);
   var cntJovenes=0,cntCatSac=0,cntCocineros=0;
-  var cntJovenesEspera=0;if(inscriptosData&&inscriptosData.ok){var activos=inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja';});cntJovenes=activos.filter(function(i){return i.rol==='Participante'&&i.estadoCupo==='con_cupo';}).length;cntJovenesEspera=activos.filter(function(i){return i.rol==='Participante'&&i.estadoCupo==='lista_espera';}).length;cntCatSac=activos.filter(function(i){return i.rol==='Catequista'||i.rol==='Sacerdote';}).length;cntCocineros=activos.filter(function(i){return i.rol==='Cocinero';}).length;}else{cntJovenes=adminData.totalInscriptos;}
+  if(inscriptosData&&inscriptosData.ok){var activos=inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja';});cntJovenes=activos.filter(function(i){return i.rol==='Participante';}).length;cntCatSac=activos.filter(function(i){return i.rol==='Catequista'||i.rol==='Sacerdote';}).length;cntCocineros=activos.filter(function(i){return i.rol==='Cocinero';}).length;}else{cntJovenes=adminData.totalInscriptos;}
   $$('admin-stats').innerHTML=
-    stat(cntJovenes,'var(--b)','Jóvenes confirmados',cntJovenesEspera?(cntJovenesEspera+' en lista de espera'):'')+
+    stat(cntJovenes,'var(--b)','Jóvenes inscriptos')+
     stat(cntCatSac,'var(--b)','Catequistas y sacerdotes')+
     stat(cntCocineros,'var(--b)','Cocineros inscriptos')+
     stat(porRevisar,'var(--a)','Por revisar')+
@@ -1730,9 +1730,9 @@ function renderAdminStats(){
   });
   var pendientesPago=pendientesDePagoCantidad(personas);
   var cntJovenes=0,cntCatSac=0,cntCocineros=0;
-  var cntJovenesEspera=0;if(inscriptosData&&inscriptosData.ok){var activos=inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja';});cntJovenes=activos.filter(function(i){return i.rol==='Participante'&&i.estadoCupo==='con_cupo';}).length;cntJovenesEspera=activos.filter(function(i){return i.rol==='Participante'&&i.estadoCupo==='lista_espera';}).length;cntCatSac=activos.filter(function(i){return i.rol==='Catequista'||i.rol==='Sacerdote';}).length;cntCocineros=activos.filter(function(i){return i.rol==='Cocinero';}).length;}else{cntJovenes=adminData.totalInscriptos;}
+  if(inscriptosData&&inscriptosData.ok){var activos=inscriptosData.inscriptos.filter(function(i){return i.estadoCupo!=='baja';});cntJovenes=activos.filter(function(i){return i.rol==='Participante';}).length;cntCatSac=activos.filter(function(i){return i.rol==='Catequista'||i.rol==='Sacerdote';}).length;cntCocineros=activos.filter(function(i){return i.rol==='Cocinero';}).length;}else{cntJovenes=adminData.totalInscriptos;}
   $$('admin-stats').innerHTML=
-    stat(cntJovenes,'var(--b)','Jóvenes confirmados',cntJovenesEspera?(cntJovenesEspera+' en lista de espera'):'')+
+    stat(cntJovenes,'var(--b)','Jóvenes inscriptos')+
     stat(cntCatSac,'var(--b)','Catequistas y sacerdotes')+
     stat(cntCocineros,'var(--b)','Cocineros inscriptos')+
     stat(porRevisar,'var(--a)','Por revisar')+
@@ -4184,7 +4184,7 @@ async function exportarCSV(){
   }catch(e){alert('Error al exportar.');}
 }
 
-function stat(val,color,label,nota){return '<div class="astat"><div class="n" style="color:'+color+'">'+val+'</div><div class="l">'+label+'</div>'+(nota?'<div class="l" style="font-size:.6rem;color:var(--b);margin-top:.1rem">'+nota+'</div>':'')+'</div>';}
+function stat(val,color,label){return '<div class="astat"><div class="n" style="color:'+color+'">'+val+'</div><div class="l">'+label+'</div></div>';}
 function showMsg(el,txt,ok){el.textContent=txt;el.className='mbox '+(ok?'mok':'mer');el.style.display='block';}
 </script>
 </body>
