@@ -2985,35 +2985,9 @@ function planExportarHabitacionesWA(){
 }
 
 function planGuardarMicros(){
-  planGuardarHabitaciones(); // guarda localmente (localStorage)
-  planGuardarHabitacionesRemoto(); // sincroniza con Sheets
-}
-
-// Extender planPayloadHabitaciones para incluir micros y subgrupos
-var _planPayloadHabitacionesOrig=planPayloadHabitaciones;
-function planPayloadHabitaciones(){
-  var base=_planPayloadHabitacionesOrig();
-  base.micros=PLAN_STATE.micros;
-  base.subgrupos=PLAN_STATE.subgrupos;
-  return base;
-}
-
-// Extender planAplicarHabitacionesGuardadas para restaurar micros y subgrupos
-var _planAplicarOrig=planAplicarHabitacionesGuardadas;
-function planAplicarHabitacionesGuardadas(data){
-  var ok=_planAplicarOrig(data);
-  if(ok&&data.micros){
-    // Restaurar micros — solo si los IDs de comunidad siguen existiendo
-    if(data.micros.comunidades) PLAN_STATE.micros.comunidades=data.micros.comunidades;
-    if(data.micros.personas) PLAN_STATE.micros.personas=data.micros.personas;
-    if(data.micros.especiales) PLAN_STATE.micros.especiales=data.micros.especiales;
-    if(data.micros.capacidades) PLAN_STATE.micros.capacidades=data.micros.capacidades;
-  }
-  if(ok&&data.subgrupos){
-    if(data.subgrupos.a) PLAN_STATE.subgrupos.a=data.subgrupos.a;
-    if(data.subgrupos.b) PLAN_STATE.subgrupos.b=data.subgrupos.b;
-  }
-  return ok;
+  // Guarda el estado de micros junto con habitaciones en el mismo storage
+  planGuardarHabitaciones();
+  planGuardarHabitacionesRemoto();
 }
 
 var MICROS_COLS_DEF=[
