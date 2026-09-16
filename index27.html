@@ -1335,17 +1335,6 @@ function personaTieneCuotasConfirmadas(persona,keys){
 }
 
 function pendientesDePagoCantidad(personas){
-  // Cuenta personas (no cuotas) que deben al menos una cuota del plan completo
-  if(inscriptosData&&inscriptosData.ok){
-    return inscriptosData.inscriptos.filter(function(i){
-      if(i.estadoCupo==='baja') return false;
-      if(i.pagoCompletoManual) return false;
-      if(i.rol==='Sacerdote') return false;
-      if(i.tipoPlan==='libre') return false;
-      return i.estado!=='pago_completo';
-    }).length;
-  }
-  // Fallback si inscriptosData no cargó todavía
   var exigibles=cuotasExigiblesHoy();
   var alDia=personas.filter(function(p){return personaTieneCuotasConfirmadas(p,exigibles);}).length;
   return Math.max(0,(adminData.totalInscriptos||0)-alDia);
